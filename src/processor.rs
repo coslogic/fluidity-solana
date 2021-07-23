@@ -1,7 +1,8 @@
 // Fluidity smart contract state processor
 
 use {
-    borsh::{BorshDeserialize, BorshSerialize},
+    borsh::{BorshDeserialize},
+    std::convert::TryInto,
     solana_program::{
         account_info::{next_account_info, AccountInfo},
         entrypoint::ProgramResult,
@@ -15,17 +16,20 @@ use {
 #[derive(BorshDeserialize, Debug, PartialEq, Clone)]
 enum FluidityInstruction {
     // enlist transaction with signature (as string since BorshSerialize is not implemented for Signature), sender, and receiver
-    EnlistTxn (String, Pubkey, Pubkey),
+    EnlistTxn ([u8; 64], Pubkey, Pubkey),
     // flush transactions from list
     FlushTxns,
 }
 
+/* this is not needed since it's more efficient to just directly edit the values of bytes,
+ * but it serves as a useful reminder of the data structure.
 #[derive(BorshDeserialize, BorshSerialize, Debug)]
 pub struct PoolAccount {
-    pub txns: Vec<(String, Pubkey, Pubkey)>,
+    pub txns: Vec<([u8; 64], Pubkey, Pubkey)>,
 }
+*/
 
-fn enlist(program_id: &Pubkey, accounts: &[AccountInfo], sig: String, sender: Pubkey, receiver: Pubkey) -> ProgramResult {
+fn enlist(program_id: &Pubkey, accounts: &[AccountInfo], sig: &[u8; 64], sender: Pubkey, receiver: Pubkey) -> ProgramResult {
     // get first account from account infos, this should be the pool account.
     let accounts_iter = &mut accounts.iter();
     let pool_account = next_account_info(accounts_iter)?;
@@ -37,11 +41,42 @@ fn enlist(program_id: &Pubkey, accounts: &[AccountInfo], sig: String, sender: Pu
     }
 
     let mut data = pool_account.try_borrow_mut_data().unwrap();
-    let mut pool = PoolAccount::deserialize(&mut &data[..]).unwrap();
+    let mut count = u32::from_le_bytes(data[0..4].try_into().expect("Bad data slice"));
+    let mut start = count as usize * 128 + 4;
+    for i in 0..64 {
+        data[i + start] = sig[i];
+    }
+    start += 64;
+    let pk_bytes = sender.to_bytes();
+    for i in 0..32 {
+        data[i + start] = pk_bytes[i];
+    }
+    start += 32;
+    let pk_bytes = receiver.to_bytes();
+    for i in 0..32 {
+        data[i + start] = pk_bytes[i];
+    }
+    count += 1;
+    let count_bytes = count.to_le_bytes();
+    for i in 0..4 {
+        data[i] = count_bytes[i];
+    }
 
-    msg!("{:?}", pool);
-    pool.txns.push((sig, sender, receiver));
-    pool.serialize(&mut &mut data[..])?;
+    Ok(())
+}
+
+fn flush(accounts: &[AccountInfo]) -> ProgramResult {
+    // get pool account from account infos
+    let accounts_iter = &mut accounts.iter();
+    let pool_account = next_account_info(accounts_iter)?;
+
+    // do something with the txns
+
+    // zero the data
+    let mut data = pool_account.try_borrow_mut_data().unwrap();
+    for i in 0..4 {
+        data[i] = 0;
+    }
     Ok(())
 }
 
@@ -49,11 +84,10 @@ pub fn process(program_id: &Pubkey, accounts: &[AccountInfo], input: &[u8]) -> P
     let instruction = FluidityInstruction::try_from_slice(input)?;
     match instruction {
         FluidityInstruction::EnlistTxn (sig, sender, receiver) => {
-            return enlist(&program_id, &accounts, sig, sender, receiver);
+            return enlist(&program_id, &accounts, &sig, sender, receiver);
         }
         FluidityInstruction::FlushTxns => {
-            msg!("Flush transactions!");
+            return flush(&accounts);
         }
     };
-    Ok(())
 }

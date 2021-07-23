@@ -1,43 +1,45 @@
 use {
+    std::env,
     solana_client::rpc_client::RpcClient,
     solana_sdk::{
         pubkey::Pubkey,
-        signature::{Signature, Signer},
+        signature::{Signer},
         instruction::{AccountMeta, Instruction},
         signer::keypair::Keypair,
         transaction::Transaction,
         system_instruction,
     },
-    serde::Serialize,
     borsh::{BorshSerialize, BorshDeserialize},
-    solana_transaction_status::UiTransactionEncoding,
     std::str::FromStr,
 };
 
 #[derive(BorshSerialize)]
 enum FluidityInstruction {
-    EnlistTxn(String, Pubkey, Pubkey),
+    EnlistTxn([u8; 64], Pubkey, Pubkey),
     FlushTxns,
 }
 
+// [u8; 64] is used here since borshserialize isn't implemented for signature::Signature.
+// could be worth impl'ing, but i can't be bothered right now.
 #[derive(BorshDeserialize, BorshSerialize, Debug)]
 pub struct PoolAccount {
-    pub txns: Vec<(String, Pubkey, Pubkey)>,
+    pub txns: Vec<([u8; 64], Pubkey, Pubkey)>,
 }
 
 fn test_smart_contract(client: &RpcClient) {
     // program id to send instructions to
     let prog_id = Pubkey::from_str("H1BodyrgaWK8nH6Z8wB3iP96memtTFWQv8GdCS4eQ61X").unwrap();
 
-    // calculate fees
+    /*// calculate fees
     let mut fees = 0;
+    fees += feecalc.lamports_per_signature * 100; */
     let (recent_blockhash, feecalc) = client.get_recent_blockhash().unwrap();
-    fees += feecalc.lamports_per_signature * 100;
 
     // create account to pay for everything
+    // here i'm using the default account for my test validator, but that won't work on anything except my system.
     let payer = Keypair::from_bytes(&[127,94,209,21,1,167,119,180,188,229,9,157,68,153,36,112,68,100,81,53,204,236,73,107,125,5,87,233,241,57,233,235,122,7,17,70,84,169,115,252,108,223,133,54,56,135,195,66,46,219,239,136,167,136,15,205,210,112,31,149,65,126,76,98]).unwrap();
-    /*
-    let payer = Keypair::new();
+
+    /*let payer = Keypair::new();
     // send airdrop to our new payer acc
     let mut sig = match client.request_airdrop(&payer.pubkey(), fees) {
         Ok(sig) => sig,
@@ -48,8 +50,7 @@ fn test_smart_contract(client: &RpcClient) {
         Ok(o) => !o,
         Err(e) => panic!("Failed to confirm airdrop: {}", e),
     }{};
-    println!("{}", sig);
-    */
+    println!("{}", sig);*/
 
     // derive address of pool account
     let pool_account_seed = "FLU: POOL ACCOUNT";
@@ -57,7 +58,7 @@ fn test_smart_contract(client: &RpcClient) {
     println!("{}", pool_pubkey);
     // check if account exists
     match client.get_account_with_commitment(&pool_pubkey, solana_sdk::commitment_config::CommitmentConfig::confirmed()).unwrap().value {
-        Some(_) => {println!("pool account exists!")},
+        Some(_) => println!("pool account exists!"),
         None => {
             match client.send_and_confirm_transaction(&Transaction::new_signed_with_payer(
                 &[system_instruction::create_account_with_seed(
@@ -77,11 +78,21 @@ fn test_smart_contract(client: &RpcClient) {
                 Err(e) => panic!("Failed to create pool account: {}", e),
             };
         },
-    }
+    };
 
     // establish instruction to send to program
-    let inst = Instruction::new_with_borsh(prog_id, &[FluidityInstruction::EnlistTxn("f4ke".to_string(), payer.pubkey(), prog_id)], vec![AccountMeta::new(pool_pubkey, false)]);
-    //let inst = Instruction::new_with_borsh(prog_id, &[FluidityInstruction::FlushTxns], vec![]);
+    let inst = match env::args().nth(1).as_ref().map(|s| s.as_str()) {
+        Some("flush") => Instruction::new_with_borsh(
+            prog_id,
+            &[FluidityInstruction::FlushTxns],
+            vec![AccountMeta::new(pool_pubkey, false)]
+        ),
+        _ => Instruction::new_with_borsh(
+            prog_id,
+            &[FluidityInstruction::EnlistTxn([u8::MAX; 64], payer.pubkey(), prog_id)],
+            vec![AccountMeta::new(pool_pubkey, false)]
+        ),
+    };
 
     // create and send txn to program
     let mut txn = Transaction::new_with_payer(&[inst], Some(&payer.pubkey()));
@@ -93,6 +104,31 @@ fn test_smart_contract(client: &RpcClient) {
 }
 
 fn get_txn_pool(client: &RpcClient) {
+    // program id to send instructions to
+    let prog_id = Pubkey::from_str("H1BodyrgaWK8nH6Z8wB3iP96memtTFWQv8GdCS4eQ61X").unwrap();
+
+    // create account to pay for everything
+    // here i'm using the default account for my test validator, but that won't work on anything except my system.
+    let payer = Keypair::from_bytes(&[127,94,209,21,1,167,119,180,188,229,9,157,68,153,36,112,68,100,81,53,204,236,73,107,125,5,87,233,241,57,233,235,122,7,17,70,84,169,115,252,108,223,133,54,56,135,195,66,46,219,239,136,167,136,15,205,210,112,31,149,65,126,76,98]).unwrap();
+
+    // derive address of pool account
+    let pool_account_seed = "FLU: POOL ACCOUNT";
+    let pool_pubkey = Pubkey::create_with_seed(&payer.pubkey(), &pool_account_seed, &prog_id).unwrap();
+    println!("{}", pool_pubkey);
+
+    let acc = match client.get_account_with_commitment(&pool_pubkey, solana_sdk::commitment_config::CommitmentConfig::confirmed()).unwrap().value {
+        Some(acc) => {
+            println!("Pool account exists!");
+            acc
+        },
+        None => panic!("Pool account does not exist!"),
+    };
+    println!("{:?}", PoolAccount::deserialize(&mut &acc.data[..]));
+}
+
+fn test_borsh_stuff() {
+    let data = PoolAccount{txns: vec![([u8::MAX; 64], Pubkey::new_unique(), Pubkey::new_unique()); 256]}.try_to_vec();
+    println!("{:?}", data);
 }
 
 fn main() {
@@ -100,5 +136,9 @@ fn main() {
     let client = RpcClient::new("http://localhost:8899".to_string());
 
     // test smart contract functions
-    test_smart_contract(&client);
+    match env::args().nth(1).as_ref().map(|s| s.as_str()) {
+        Some("check") => get_txn_pool(&client),
+        Some("test") => test_borsh_stuff(),
+        _ => test_smart_contract(&client),
+    };
 }
