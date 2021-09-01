@@ -34,6 +34,7 @@ pub struct PoolAccount {
 fn test_smart_contract(client: &RpcClient) {
     // program id to send instructions to
     let prog_id = Pubkey::from_str("H1BodyrgaWK8nH6Z8wB3iP96memtTFWQv8GdCS4eQ61X").unwrap();
+    let token_id = Pubkey::from_str("AU2Es981HkuzpF4RJzTDe6GceGCcwzj5xBDP2kQGXMRd").unwrap();
 
     /*// calculate fees
     let mut fees = 0;
@@ -57,58 +58,16 @@ fn test_smart_contract(client: &RpcClient) {
     }{};
     println!("{}", sig);*/
 
-    // derive address of pool account
-    let pool_account_seed = "FLU: POOL ACCOUNT";
-    let pool_pubkey = Pubkey::create_with_seed(&payer.pubkey(), &pool_account_seed, &prog_id).unwrap();
-    println!("{}, {}", payer.pubkey().to_string(), pool_pubkey);
-    // check if account exists
-    match client.get_account_with_commitment(&pool_pubkey, solana_sdk::commitment_config::CommitmentConfig::confirmed()).unwrap().value {
-        Some(_) => println!("pool account exists!"),
-        None => {
-            match client.send_and_confirm_transaction(&Transaction::new_signed_with_payer(
-                &[system_instruction::create_account_with_seed(
-                    &payer.pubkey(),
-                    &pool_pubkey,
-                    &payer.pubkey(),
-                    &pool_account_seed,
-                    feecalc.lamports_per_signature * 10_000_000,
-                    10_000_000,
-                    &prog_id,
-                )],
-                Some(&payer.pubkey()),
-                &[&payer],
-                recent_blockhash,
-            )) {
-                Ok(_) => {},
-                Err(e) => panic!("Failed to create pool account: {}", e),
-            };
-        },
-    };
+    // derive address of mint account
+    let mint_account_seed = b"FLU: MINT ACCOUNT";
+    let (mint_pubkey, bump_seed) = Pubkey::find_program_address(&[mint_account_seed], &prog_id);
+    println!("{}", mint_pubkey);
 
-    // establish instruction to send to program
-    let inst = match env::args().nth(1).as_ref().map(|s| s.as_str()) {
-        Some("flush") => {
-            Instruction::new_with_borsh(
-                prog_id,
-                &[FluidityInstruction::FlushTxns],
-                vec![AccountMeta::new(pool_pubkey, false), AccountMeta::new(prog_id, false)]
-            )
-        }
-        Some ("wrap") => {
-            Instruction::new_with_borsh(
-                prog_id,
-                &FluidityInstruction::Wrap(1),
-                vec![AccountMeta::new(pool_pubkey, false), AccountMeta::new(payer.pubkey(), true)], 
-            )
-        }
-        _ => {
-            Instruction::new_with_borsh(
-                prog_id,
-                &[FluidityInstruction::EnlistTxn([u8::MAX; 64], payer.pubkey(), prog_id)],
-                vec![AccountMeta::new(pool_pubkey, false)]
-            )
-        }
-    };
+    let inst = Instruction::new_with_borsh(
+        prog_id,
+        &FluidityInstruction::Wrap(1),
+        vec![AccountMeta::new(prog_id, false), AccountMeta::new(token_id, false), AccountMeta::new(payer.pubkey(), true)], 
+    );
 
     // create and send txn to program
     let mut txn = Transaction::new_with_payer(&[inst], Some(&payer.pubkey()));

@@ -14,6 +14,7 @@ use {
         instruction::{Instruction, AccountMeta},
         msg,
     },
+    spl_token::instruction::mint_to_checked,
 };
 
 // enum for processes executable by fluidity smart contract
@@ -109,12 +110,17 @@ fn wrap(accounts: &[AccountInfo], amount: u64) -> ProgramResult {
     let sender_accountinfo = next_account_info(accounts_iter)?;
     let mut sender_lamports = sender_accountinfo.try_borrow_mut_lamports()?;
     //**pool_lamports -= amount;
-    /*
+    let (auth_pubkey, bump_seed) = Pubkey::find_program_address(&[b"FLU: MINT ACCOUNT"], &program_accountinfo.key);
+
     let instruction = mint_to_checked (
-        spl_token::ID,
-        mint_account.Pubkey,
-        sender
-    );*/
+        &spl_token::ID,
+        &mint_accountinfo.key,
+        &sender_accountinfo.key,
+        &auth_pubkey,
+        &[&auth_pubkey],
+        amount * 10_u64.pow(9),
+        9
+    ).unwrap();
 
     Ok(())
 }
