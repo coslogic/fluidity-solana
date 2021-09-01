@@ -105,22 +105,27 @@ fn flush(accounts: &[AccountInfo]) -> ProgramResult {
 
 fn wrap(accounts: &[AccountInfo], amount: u64) -> ProgramResult {
     let accounts_iter = &mut accounts.iter();
-    let program_accountinfo = next_account_info(accounts_iter)?;
-    let mint_accountinfo = next_account_info(accounts_iter)?;
-    let sender_accountinfo = next_account_info(accounts_iter)?;
+    let token_program = next_account_info(accounts_iter)?;
+    let mint = next_account_info(accounts_iter)?;
+    let pda_account = next_account_info(accounts_iter)?;
+    let sender = next_account_info(accounts_iter)?;
     let mut sender_lamports = sender_accountinfo.try_borrow_mut_lamports()?;
     //**pool_lamports -= amount;
     let (auth_pubkey, bump_seed) = Pubkey::find_program_address(&[b"FLU: MINT ACCOUNT"], &program_accountinfo.key);
 
-    let instruction = mint_to_checked (
-        &spl_token::ID,
-        &mint_accountinfo.key,
-        &sender_accountinfo.key,
-        &auth_pubkey,
-        &[&auth_pubkey],
-        amount * 10_u64.pow(9),
-        9
-    ).unwrap();
+    invoke_signed(
+        &mint_to_checked (
+            &token_program.key,
+            &mint.key,
+            &sender.key,
+            &pda_account.key,
+            &[&pda_account.key],
+            amount * 10_u64.pow(9),
+            9
+        ).unwrap(),
+        &[mint_accountinfo.clone(), sender_accountinfo.clone(), pda_account.clone()],
+        &[&[&b"FLU: MINT ACCOUNT"[..], &[bump_seed]]],
+    )?;
 
     Ok(())
 }

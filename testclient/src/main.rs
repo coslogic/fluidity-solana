@@ -15,6 +15,7 @@ use {
     borsh::{BorshSerialize, BorshDeserialize},
     std::str::FromStr,
     websocket,
+    spl_token,
 };
 
 #[derive(BorshSerialize)]
@@ -61,12 +62,12 @@ fn test_smart_contract(client: &RpcClient) {
     // derive address of mint account
     let mint_account_seed = b"FLU: MINT ACCOUNT";
     let (mint_pubkey, bump_seed) = Pubkey::find_program_address(&[mint_account_seed], &prog_id);
-    println!("{}", mint_pubkey);
+    println!("{}, {}", mint_pubkey, bump_seed);
 
     let inst = Instruction::new_with_borsh(
         prog_id,
         &FluidityInstruction::Wrap(1),
-        vec![AccountMeta::new(prog_id, false), AccountMeta::new(token_id, false), AccountMeta::new(payer.pubkey(), true)], 
+        vec![AccountMeta::new(spl_token::ID, false), AccountMeta::new(token_id, false), AccountMeta::new(mint_pubkey, false), AccountMeta::new(payer.pubkey(), true)], 
     );
 
     // create and send txn to program
@@ -123,7 +124,7 @@ fn test_borsh_stuff() {
 
 fn main() {
     // connect to local testnet
-    let client = RpcClient::new("http://localhost:8899".to_string());
+    let client = RpcClient::new("http://thorondir.bounceme.net:8899".to_string());
 
     // test smart contract functions
     match env::args().nth(1).as_ref().map(|s| s.as_str()) {
