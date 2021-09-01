@@ -109,6 +109,11 @@ fn wrap(accounts: &[AccountInfo], amount: u64) -> ProgramResult {
     let mint = next_account_info(accounts_iter)?;
     let pda_account = next_account_info(accounts_iter)?;
     let sender = next_account_info(accounts_iter)?;
+
+    let mut second_sender = sender.clone();
+    second_sender.is_signer = false;
+    let mut second_pda_account = pda_account.clone();
+    second_pda_account.is_signer = false;
     //let mut sender_lamports = sender_accountinfo.try_borrow_mut_lamports()?;
     //**pool_lamports -= amount;
 
@@ -123,7 +128,7 @@ fn wrap(accounts: &[AccountInfo], amount: u64) -> ProgramResult {
             9
         ).unwrap(),
         &[mint.clone(), sender.clone(), pda_account.clone()],
-        &[&[&b"FLU: MINT ACCOUNT"[..], &[252]]],
+        &[&[&b"FLU: MINT ACCOUNT"[..], &[255]]],
     )?;
 
     Ok(())

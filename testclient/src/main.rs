@@ -34,7 +34,7 @@ pub struct PoolAccount {
 
 fn test_smart_contract(client: &RpcClient) {
     // program id to send instructions to
-    let prog_id = Pubkey::from_str("H1BodyrgaWK8nH6Z8wB3iP96memtTFWQv8GdCS4eQ61X").unwrap();
+    let prog_id = Pubkey::from_str("CTZtmgscfFZztNRrb8HnbRLpUiujcEuK1YN86aYbHajf").unwrap();
     let token_id = Pubkey::from_str("AU2Es981HkuzpF4RJzTDe6GceGCcwzj5xBDP2kQGXMRd").unwrap();
 
     /*// calculate fees
@@ -45,6 +45,7 @@ fn test_smart_contract(client: &RpcClient) {
     // create account to pay for everything
     // here i'm using the default account for my test validator, but that won't work on anything except my system.
     let payer = Keypair::from_bytes(&[127,94,209,21,1,167,119,180,188,229,9,157,68,153,36,112,68,100,81,53,204,236,73,107,125,5,87,233,241,57,233,235,122,7,17,70,84,169,115,252,108,223,133,54,56,135,195,66,46,219,239,136,167,136,15,205,210,112,31,149,65,126,76,98]).unwrap();
+    println!("{}", payer.pubkey());
 
     /*let payer = Keypair::new();
     // send airdrop to our new payer acc
