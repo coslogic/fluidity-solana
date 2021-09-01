@@ -109,9 +109,8 @@ fn wrap(accounts: &[AccountInfo], amount: u64) -> ProgramResult {
     let mint = next_account_info(accounts_iter)?;
     let pda_account = next_account_info(accounts_iter)?;
     let sender = next_account_info(accounts_iter)?;
-    let mut sender_lamports = sender_accountinfo.try_borrow_mut_lamports()?;
+    //let mut sender_lamports = sender_accountinfo.try_borrow_mut_lamports()?;
     //**pool_lamports -= amount;
-    let (auth_pubkey, bump_seed) = Pubkey::find_program_address(&[b"FLU: MINT ACCOUNT"], &program_accountinfo.key);
 
     invoke_signed(
         &mint_to_checked (
@@ -123,8 +122,8 @@ fn wrap(accounts: &[AccountInfo], amount: u64) -> ProgramResult {
             amount * 10_u64.pow(9),
             9
         ).unwrap(),
-        &[mint_accountinfo.clone(), sender_accountinfo.clone(), pda_account.clone()],
-        &[&[&b"FLU: MINT ACCOUNT"[..], &[bump_seed]]],
+        &[mint.clone(), sender.clone(), pda_account.clone()],
+        &[&[&b"FLU: MINT ACCOUNT"[..], &[252]]],
     )?;
 
     Ok(())
