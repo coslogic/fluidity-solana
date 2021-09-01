@@ -1,6 +1,9 @@
 use {
     std::env,
-    solana_client::rpc_client::RpcClient,
+    solana_client::{
+        rpc_client::RpcClient,
+        rpc_request::RpcError,
+    },
     solana_sdk::{
         pubkey::Pubkey,
         signature::{Signer},
@@ -11,11 +14,13 @@ use {
     },
     borsh::{BorshSerialize, BorshDeserialize},
     std::str::FromStr,
+    websocket,
 };
 
 #[derive(BorshSerialize)]
 enum FluidityInstruction {
     EnlistTxn([u8; 64], Pubkey, Pubkey),
+    Wrap(u64),
     FlushTxns,
 }
 
@@ -55,7 +60,7 @@ fn test_smart_contract(client: &RpcClient) {
     // derive address of pool account
     let pool_account_seed = "FLU: POOL ACCOUNT";
     let pool_pubkey = Pubkey::create_with_seed(&payer.pubkey(), &pool_account_seed, &prog_id).unwrap();
-    println!("{}", pool_pubkey);
+    println!("{}, {}", payer.pubkey().to_string(), pool_pubkey);
     // check if account exists
     match client.get_account_with_commitment(&pool_pubkey, solana_sdk::commitment_config::CommitmentConfig::confirmed()).unwrap().value {
         Some(_) => println!("pool account exists!"),
@@ -82,16 +87,27 @@ fn test_smart_contract(client: &RpcClient) {
 
     // establish instruction to send to program
     let inst = match env::args().nth(1).as_ref().map(|s| s.as_str()) {
-        Some("flush") => Instruction::new_with_borsh(
-            prog_id,
-            &[FluidityInstruction::FlushTxns],
-            vec![AccountMeta::new(pool_pubkey, false)]
-        ),
-        _ => Instruction::new_with_borsh(
-            prog_id,
-            &[FluidityInstruction::EnlistTxn([u8::MAX; 64], payer.pubkey(), prog_id)],
-            vec![AccountMeta::new(pool_pubkey, false)]
-        ),
+        Some("flush") => {
+            Instruction::new_with_borsh(
+                prog_id,
+                &[FluidityInstruction::FlushTxns],
+                vec![AccountMeta::new(pool_pubkey, false), AccountMeta::new(prog_id, false)]
+            )
+        }
+        Some ("wrap") => {
+            Instruction::new_with_borsh(
+                prog_id,
+                &FluidityInstruction::Wrap(1),
+                vec![AccountMeta::new(pool_pubkey, false), AccountMeta::new(payer.pubkey(), true)], 
+            )
+        }
+        _ => {
+            Instruction::new_with_borsh(
+                prog_id,
+                &[FluidityInstruction::EnlistTxn([u8::MAX; 64], payer.pubkey(), prog_id)],
+                vec![AccountMeta::new(pool_pubkey, false)]
+            )
+        }
     };
 
     // create and send txn to program
@@ -99,7 +115,22 @@ fn test_smart_contract(client: &RpcClient) {
     txn.sign(&[&payer], recent_blockhash);
     let _sig = match client.send_transaction(&txn) {
         Ok(sig) => sig,
-        Err(e) => panic!("Failed to send txn: {}", e),
+        Err(e) => match e.kind {
+            solana_client::client_error::ClientErrorKind::RpcError(rpc_err) =>
+                match rpc_err {
+                    RpcError::RpcResponseError{code, message, data} =>
+                        panic!("Failed to send txn (RPC Error): {}{}", message, match data {
+                            solana_client::rpc_request::RpcResponseErrorData::SendTransactionPreflightFailure(res) =>
+                                match res.logs {
+                                    Some(logs) => format!("\nLogs: {:#?}", logs),
+                                    _ => "".to_string(),
+                                }
+                            _ => "".to_string(),
+                        }),
+                    RpcError::RpcRequestError(msg)|RpcError::ParseError(msg)|RpcError::ForUser(msg) => panic!("Failed to send txn (RPC Error): {}", msg),
+                }
+            _ => panic!("Failed to send txn: {}", e),
+        },
     };
 }
 

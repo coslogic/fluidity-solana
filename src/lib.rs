@@ -19,8 +19,6 @@ pub fn process_instruction(
     accounts: &[AccountInfo],
     instruction_data: &[u8],
 ) -> ProgramResult {
-    match processor::process(program_id, accounts, instruction_data) {
-        Err(error) => Err(error),
-        _ => Ok(()),
-    }
+    processor::process(program_id, accounts, instruction_data)?;
+    Ok(())
 }
