@@ -35,7 +35,8 @@ pub struct PoolAccount {
 fn test_smart_contract(client: &RpcClient) {
     // program id to send instructions to
     let prog_id = Pubkey::from_str("CTZtmgscfFZztNRrb8HnbRLpUiujcEuK1YN86aYbHajf").unwrap();
-    let token_id = Pubkey::from_str("AU2Es981HkuzpF4RJzTDe6GceGCcwzj5xBDP2kQGXMRd").unwrap();
+    let token_id = Pubkey::from_str("Bydsa9pQWkjhzvE9XVbrVKcKyaWYwJSokmG4ybFcaVZE").unwrap();
+    let token_account = Pubkey::from_str("9jC2SWeNap4FEYq7ZSQ2ktMRn7yks8rwJp2HELdSSLR3").unwrap();
 
     /*// calculate fees
     let mut fees = 0;
@@ -68,7 +69,7 @@ fn test_smart_contract(client: &RpcClient) {
     let inst = Instruction::new_with_borsh(
         prog_id,
         &FluidityInstruction::Wrap(1),
-        vec![AccountMeta::new(spl_token::ID, false), AccountMeta::new(token_id, false), AccountMeta::new(mint_pubkey, false), AccountMeta::new(payer.pubkey(), true)], 
+        vec![AccountMeta::new_readonly(spl_token::ID, false), AccountMeta::new(token_id, false), AccountMeta::new(mint_pubkey, false), AccountMeta::new(payer.pubkey(), true), AccountMeta::new(token_account, false)], 
     );
 
     // create and send txn to program

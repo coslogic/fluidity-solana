@@ -109,16 +109,15 @@ fn wrap(accounts: &[AccountInfo], amount: u64) -> ProgramResult {
     let mint = next_account_info(accounts_iter)?;
     let pda_account = next_account_info(accounts_iter)?;
     let sender = next_account_info(accounts_iter)?;
+    let token_account = next_account_info(accounts_iter)?;
 
-    let mut second_sender = sender.clone();
-    second_sender.is_signer = false;
     let mut second_pda_account = pda_account.clone();
-    second_pda_account.is_signer = false;
+    second_pda_account.is_signer = true;
     //let mut sender_lamports = sender_accountinfo.try_borrow_mut_lamports()?;
     //**pool_lamports -= amount;
 
     invoke_signed(
-        &mint_to_checked (
+        &mint_to_checked(
             &token_program.key,
             &mint.key,
             &sender.key,
@@ -127,7 +126,7 @@ fn wrap(accounts: &[AccountInfo], amount: u64) -> ProgramResult {
             amount * 10_u64.pow(9),
             9
         ).unwrap(),
-        &[mint.clone(), sender.clone(), pda_account.clone()],
+        &[mint.clone(), token_account.clone(), second_pda_account.clone(), token_program.clone()],
         &[&[&b"FLU: MINT ACCOUNT"[..], &[255]]],
     )?;
 
