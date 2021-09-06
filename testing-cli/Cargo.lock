@@ -879,7 +879,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "fluidity-solana-test-client"
+name = "fluidity-testing-cli"
 version = "0.1.0"
 dependencies = [
  "borsh",
@@ -887,6 +887,7 @@ dependencies = [
  "solana-client",
  "solana-sdk",
  "solana-transaction-status",
+ "spl-associated-token-account",
  "spl-token",
  "websocket",
 ]

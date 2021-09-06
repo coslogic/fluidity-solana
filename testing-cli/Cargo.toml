@@ -1,5 +1,5 @@
 [package]
-name = "fluidity-solana-test-client"
+name = "fluidity-testing-cli"
 version = "0.1.0"
 authors = ["Ying Stokes <ying@spi.dev>"]
 edition = "2018"
@@ -14,3 +14,4 @@ solana-client = "=1.7.4"
 solana-transaction-status = "=1.7.4"
 websocket = "0.26.2"
 spl-token = {version = "3.1.1", features=["no-entrypoint"]}
+spl-associated-token-account = "1.0.2"
