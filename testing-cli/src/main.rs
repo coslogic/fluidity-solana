@@ -26,18 +26,20 @@ enum FluidityInstruction {
 
 fn test_smart_contract(client: &RpcClient) {
     // program id to send instructions to
-    let prog_id = Pubkey::from_str("CTZtmgscfFZztNRrb8HnbRLpUiujcEuK1YN86aYbHajf").unwrap();
-    let token_id = Pubkey::from_str("Bydsa9pQWkjhzvE9XVbrVKcKyaWYwJSokmG4ybFcaVZE").unwrap();
-    let token_account = Pubkey::from_str("9jC2SWeNap4FEYq7ZSQ2ktMRn7yks8rwJp2HELdSSLR3").unwrap();
+    //let prog_id = Pubkey::from_str("CTZtmgscfFZztNRrb8HnbRLpUiujcEuK1YN86aYbHajf").unwrap();
+    //let token_id = Pubkey::from_str("Bydsa9pQWkjhzvE9XVbrVKcKyaWYwJSokmG4ybFcaVZE").unwrap();
+    //let token_account = Pubkey::from_str("8T2jfYiUdkLReHpLtHZtp8zHocNSG58hje6T226dqXyx").unwrap();
+    let prog_id = Pubkey::from_str(&env::var("FLU_PROGRAM_ID").unwrap()).unwrap();
+    let token_id = Pubkey::from_str(&env::var("FLU_TOKEN_ID").unwrap()).unwrap();
+    let token_account = Pubkey::from_str(&env::var("FLU_CLI_TOKEN_ACC").unwrap()).unwrap();
 
     // get recent blockhash
     let (recent_blockhash, _) = client.get_recent_blockhash().unwrap();
 
     // create account to pay for everything
     // here i'm using the default account for my test validator, but that won't work on anything except my system.
-    let payer = Keypair::from_bytes(&[127,94,209,21,1,167,119,180,188,229,9,157,68,153,36,112,68,100,81,53,204,
-                                      236,73,107,125,5,87,233,241,57,233,235,122,7,17,70,84,169,115,252,108,223,
-                                      133,54,56,135,195,66,46,219,239,136,167,136,15,205,210,112,31,149,65,126,76,98]).unwrap();
+    let payer = Keypair::from_bytes(&[22,34,43,58,175,94,194,175,82,66,142,68,24,207,218,72,6,198,90,108,139,206,103,100,176,247,69,172,143,190,204,187,12,252,227,17,198,165,138,87,211,221,184,212,40,223,101,174,228,189,232,164,103,9,189,225,14,237,137,247,64,212,103,68]
+                                      ).unwrap();
     println!("{}", payer.pubkey());
 
     // derive address of mint account
