@@ -15,7 +15,7 @@ use {
     borsh::BorshSerialize,
     std::str::FromStr,
     spl_token,
-    spl_associated_token_account::create_associated_token_account,
+    spl_associated_token_account,
 };
 
 #[derive(BorshSerialize)]
@@ -27,11 +27,14 @@ enum FluidityInstruction {
 fn test_smart_contract(client: &RpcClient) {
     // program id to send instructions to
     //let prog_id = Pubkey::from_str("CTZtmgscfFZztNRrb8HnbRLpUiujcEuK1YN86aYbHajf").unwrap();
-    //let token_id = Pubkey::from_str("Bydsa9pQWkjhzvE9XVbrVKcKyaWYwJSokmG4ybFcaVZE").unwrap();
+    //let fluidity_token_id = Pubkey::from_str("Bydsa9pQWkjhzvE9XVbrVKcKyaWYwJSokmG4ybFcaVZE").unwrap();
     //let token_account = Pubkey::from_str("8T2jfYiUdkLReHpLtHZtp8zHocNSG58hje6T226dqXyx").unwrap();
     let prog_id = Pubkey::from_str(&env::var("FLU_PROGRAM_ID").unwrap()).unwrap();
-    let token_id = Pubkey::from_str(&env::var("FLU_TOKEN_ID").unwrap()).unwrap();
-    let token_account = Pubkey::from_str(&env::var("FLU_CLI_TOKEN_ACC").unwrap()).unwrap();
+    let command = env::args().nth(1).unwrap();
+    if command == "help" {
+        println!("[wrap/unwrap] base_token_id fluidity_token_id base_token_account fluidity_token_account");
+        return
+    }
 
     // get recent blockhash
     let (recent_blockhash, _) = client.get_recent_blockhash().unwrap();
@@ -44,44 +47,58 @@ fn test_smart_contract(client: &RpcClient) {
 
     // derive address of mint account
     let mint_account_seed = b"FLU: MINT ACCOUNT";
-    let (mint_pubkey, bump_seed) = Pubkey::find_program_address(&[mint_account_seed], &prog_id);
-    println!("{}, {}", mint_pubkey, bump_seed);
+    let (pool_pubkey, bump_seed) = Pubkey::find_program_address(&[mint_account_seed], &prog_id);
+    println!("{}, {}", pool_pubkey, bump_seed);
 
     // select and create instruction
-    let inst = match env::args().nth(1).as_ref().map(|s| s.as_str()) {
-        Some("wrap") => {
-            let amount = env::args().nth(2).unwrap().parse::<u64>().unwrap();
+    let inst = match command.as_str() {
+        "wrap" => {
+            let amount = env::args().nth(6).unwrap().parse::<u64>().unwrap();
+            let base_token_id = Pubkey::from_str(&env::args().nth(2).unwrap()).unwrap();
+            let fluidity_token_id = Pubkey::from_str(&env::args().nth(3).unwrap()).unwrap();
+            let base_token_account = Pubkey::from_str(&env::args().nth(4).unwrap()).unwrap();
+            let fluidity_token_account = Pubkey::from_str(&env::args().nth(5).unwrap()).unwrap();
+            let pool_token_pubkey = spl_associated_token_account::get_associated_token_address(&pool_pubkey, &base_token_id);
             Instruction::new_with_borsh(
                 prog_id,
                 &FluidityInstruction::Wrap(amount),
                 vec![
                     AccountMeta::new_readonly(spl_token::ID, false),
-                    AccountMeta::new(token_id, false),
-                    AccountMeta::new(mint_pubkey, false),
+                    AccountMeta::new(base_token_id, false),
+                    AccountMeta::new(fluidity_token_id, false),
+                    AccountMeta::new(pool_pubkey, false),
+                    AccountMeta::new(pool_token_pubkey, false),
                     AccountMeta::new(payer.pubkey(), true),
-                    AccountMeta::new(token_account, false),
-                    AccountMeta::new(system_program::id(), false)
+                    AccountMeta::new(base_token_account, false),
+                    AccountMeta::new(fluidity_token_account, false),
                 ], 
             )
         }
-        Some("unwrap") => {
-            let amount = env::args().nth(2).unwrap().parse::<u64>().unwrap();
+        "unwrap" => {
+            let amount = env::args().nth(6).unwrap().parse::<u64>().unwrap();
+            let base_token_id = Pubkey::from_str(&env::args().nth(2).unwrap()).unwrap();
+            let fluidity_token_id = Pubkey::from_str(&env::args().nth(3).unwrap()).unwrap();
+            let base_token_account = Pubkey::from_str(&env::args().nth(4).unwrap()).unwrap();
+            let fluidity_token_account = Pubkey::from_str(&env::args().nth(5).unwrap()).unwrap();
+            let pool_token_pubkey = spl_associated_token_account::get_associated_token_address(&pool_pubkey, &base_token_id);
             Instruction::new_with_borsh(
                 prog_id,
                 &FluidityInstruction::Unwrap(amount),
                 vec![AccountMeta::new_readonly(spl_token::ID, false),
-                    AccountMeta::new(token_id, false),
-                    AccountMeta::new(mint_pubkey, false),
+                    AccountMeta::new(base_token_id, false),
+                    AccountMeta::new(fluidity_token_id, false),
+                    AccountMeta::new(pool_pubkey, false),
+                    AccountMeta::new(pool_token_pubkey, false),
                     AccountMeta::new(payer.pubkey(), true),
-                    AccountMeta::new(token_account, false),
-                    AccountMeta::new(system_program::id(), false)
+                    AccountMeta::new(base_token_account, false),
+                    AccountMeta::new(fluidity_token_account, false),
                 ], 
             )
         }
-        Some("createacc") => {
+        "createacc" => {
             let mint_pk = Pubkey::from_str(&env::args().nth(2).unwrap()).unwrap();
             let acc_pk = Pubkey::from_str(&env::args().nth(3).unwrap()).unwrap();
-            create_associated_token_account(
+            spl_associated_token_account::create_associated_token_account(
                 &payer.pubkey(),
                 &acc_pk,
                 &mint_pk,

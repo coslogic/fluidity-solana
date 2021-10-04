@@ -12,7 +12,7 @@ use {
         system_instruction::transfer,
         msg,
     },
-    spl_token::instruction::{mint_to_checked, burn_checked},
+    spl_token,
 };
 
 // enum for processes executable by fluidity smart contract
@@ -27,32 +27,36 @@ enum FluidityInstruction {
 fn wrap(accounts: &[AccountInfo], amount: u64) -> ProgramResult {
     let accounts_iter = &mut accounts.iter();
     let token_program = next_account_info(accounts_iter)?;
-    let mint = next_account_info(accounts_iter)?;
+    let token_mint = next_account_info(accounts_iter)?;
+    let fluidity_mint = next_account_info(accounts_iter)?;
     let pda_account = next_account_info(accounts_iter)?;
+    let pda_token_account = next_account_info(accounts_iter)?;
     let sender = next_account_info(accounts_iter)?;
     let token_account = next_account_info(accounts_iter)?;
-    let system_account = next_account_info(accounts_iter)?;
+    let fluidity_account = next_account_info(accounts_iter)?;
 
     invoke(
-        &transfer(
+        &spl_token::instruction::transfer(
+            &token_program.key,
+            &token_account.key,
+            &pda_token_account.key,
             &sender.key,
-            &pda_account.key,
+            &[&sender.key],
             amount,
-        ),
-        &[sender.clone(), pda_account.clone(), system_account.clone()]
+        ).unwrap(),
+        &[token_account.clone(), pda_token_account.clone(), sender.clone(), token_program.clone()]
     )?;
 
     invoke_signed(
-        &mint_to_checked(
+        &spl_token::instruction::mint_to(
             &token_program.key,
-            &mint.key,
-            &token_account.key,
+            &fluidity_mint.key,
+            &fluidity_account.key,
             &pda_account.key,
             &[&pda_account.key],
             amount,
-            9
         ).unwrap(),
-        &[mint.clone(), token_account.clone(), pda_account.clone(), token_program.clone()],
+        &[fluidity_mint.clone(), fluidity_account.clone(), pda_account.clone(), token_program.clone()],
         &[&[&b"FLU: MINT ACCOUNT"[..], &[255]]],
     )?;
 
@@ -62,32 +66,36 @@ fn wrap(accounts: &[AccountInfo], amount: u64) -> ProgramResult {
 fn unwrap(accounts: &[AccountInfo], amount: u64) -> ProgramResult {
     let accounts_iter = &mut accounts.iter();
     let token_program = next_account_info(accounts_iter)?;
-    let mint = next_account_info(accounts_iter)?;
+    let token_mint = next_account_info(accounts_iter)?;
+    let fluidity_mint = next_account_info(accounts_iter)?;
     let pda_account = next_account_info(accounts_iter)?;
+    let pda_token_account = next_account_info(accounts_iter)?;
     let sender = next_account_info(accounts_iter)?;
     let token_account = next_account_info(accounts_iter)?;
-    let system_account = next_account_info(accounts_iter)?;
+    let fluidity_account = next_account_info(accounts_iter)?;
 
     invoke(
-        &burn_checked(
+        &spl_token::instruction::burn(
             &token_program.key,
-            &token_account.key,
-            &mint.key,
+            &fluidity_account.key,
+            &fluidity_mint.key,
             &sender.key,
             &[&sender.key],
             amount,
-            9,
         ).unwrap(),
-        &[token_account.clone(), mint.clone(), sender.clone()]
+        &[fluidity_account.clone(), fluidity_mint.clone(), sender.clone()]
     )?;
 
     invoke_signed(
-        &transfer(
+        &spl_token::instruction::transfer(
+            &token_program.key,
             &pda_account.key,
-            &sender.key,
+            &token_account.key,
+            &pda_account.key,
+            &[&pda_account.key],
             amount,
-        ),
-        &[pda_account.clone(), sender.clone(), system_account.clone()],
+        ).unwrap(),
+        &[pda_account.clone(), token_account.clone(), token_program.clone()],
         &[&[&b"FLU: MINT ACCOUNT"[..], &[255]]],
     )?;
 
