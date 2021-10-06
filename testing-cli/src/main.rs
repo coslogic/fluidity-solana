@@ -26,9 +26,7 @@ enum FluidityInstruction {
 
 fn test_smart_contract(client: &RpcClient) {
     // program id to send instructions to
-    //let prog_id = Pubkey::from_str("CTZtmgscfFZztNRrb8HnbRLpUiujcEuK1YN86aYbHajf").unwrap();
-    //let fluidity_token_id = Pubkey::from_str("Bydsa9pQWkjhzvE9XVbrVKcKyaWYwJSokmG4ybFcaVZE").unwrap();
-    //let token_account = Pubkey::from_str("8T2jfYiUdkLReHpLtHZtp8zHocNSG58hje6T226dqXyx").unwrap();
+
     let prog_id = Pubkey::from_str(&env::var("FLU_PROGRAM_ID").unwrap()).unwrap();
     let command = env::args().nth(1).unwrap();
     if command == "help" {
@@ -41,8 +39,8 @@ fn test_smart_contract(client: &RpcClient) {
 
     // create account to pay for everything
     // here i'm using the default account for my test validator, but that won't work on anything except my system.
-    let payer = Keypair::from_bytes(&[22,34,43,58,175,94,194,175,82,66,142,68,24,207,218,72,6,198,90,108,139,206,103,100,176,247,69,172,143,190,204,187,12,252,227,17,198,165,138,87,211,221,184,212,40,223,101,174,228,189,232,164,103,9,189,225,14,237,137,247,64,212,103,68]
-                                      ).unwrap();
+    let key_bytes = std::fs::read_to_string(&env::var("SOLANA_ID_PATH").unwrap()).unwrap();
+    let payer = Keypair::from_bytes(&(serde_json::from_str::<Vec<u8>>(&key_bytes).unwrap())).unwrap();
     println!("{}", payer.pubkey());
 
     // derive address of mint account
