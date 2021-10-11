@@ -1,3 +1,5 @@
+use solana_client::client_error::reqwest::blocking::Response;
+
 use {
     std::env,
     solana_client::{
@@ -10,7 +12,9 @@ use {
         instruction::{AccountMeta, Instruction},
         signer::keypair::Keypair,
         transaction::Transaction,
+        sysvar,
         system_program,
+        system_instruction,
     },
     borsh::BorshSerialize,
     std::str::FromStr,
@@ -22,6 +26,7 @@ use {
 enum FluidityInstruction {
     Wrap (u64),
     Unwrap (u64),
+    InitSolendObligation (u64, u64),
 }
 
 fn test_smart_contract(client: &RpcClient) {
@@ -59,26 +64,51 @@ fn test_smart_contract(client: &RpcClient) {
     // select and create instruction
     let inst = match command.as_str() {
         "wrap" => {
-            let amount = env::args().nth(6).unwrap().parse::<u64>().unwrap();
-            let base_token_id = Pubkey::from_str(&env::args().nth(2).unwrap()).unwrap();
-            let fluidity_token_id = Pubkey::from_str(&env::args().nth(3).unwrap()).unwrap();
-            let base_token_account = Pubkey::from_str(&env::args().nth(4).unwrap()).unwrap();
-            let fluidity_token_account = Pubkey::from_str(&env::args().nth(5).unwrap()).unwrap();
-            let pda_token_pubkey = spl_associated_token_account::get_associated_token_address(&pda_pubkey, &base_token_id);
-            Instruction::new_with_borsh(
-                prog_id,
-                &FluidityInstruction::Wrap(amount),
-                vec![
-                    AccountMeta::new_readonly(spl_token::ID, false),
-                    AccountMeta::new(base_token_id, false),
-                    AccountMeta::new(fluidity_token_id, false),
-                    AccountMeta::new(pda_pubkey, false),
-                    AccountMeta::new(pda_token_pubkey, false),
-                    AccountMeta::new(payer.pubkey(), true),
-                    AccountMeta::new(base_token_account, false),
-                    AccountMeta::new(fluidity_token_account, false),
-                ], 
-            )
+            let amount = env::args().nth(2).unwrap().parse::<u64>().unwrap();
+            let base_token_id = Pubkey::from_str(&env::args().nth(3).unwrap()).unwrap();
+            let fluidity_token_id = Pubkey::from_str(&env::args().nth(4).unwrap()).unwrap();
+            let base_token_account = Pubkey::from_str(&env::args().nth(5).unwrap()).unwrap();
+            let fluidity_token_account = Pubkey::from_str(&env::args().nth(6).unwrap()).unwrap();
+            let solend_program = Pubkey::from_str(&env::args().nth(7).unwrap()).unwrap();
+            let pda_token_account = Pubkey::from_str(&env::args().nth(8).unwrap()).unwrap();
+            let collateral_account = Pubkey::from_str(&env::args().nth(9).unwrap()).unwrap();
+            let reserve = Pubkey::from_str(&env::args().nth(10).unwrap()).unwrap();
+            let reserve_liquidity_supply = Pubkey::from_str(&env::args().nth(11).unwrap()).unwrap();
+            let collateral_mint = Pubkey::from_str(&env::args().nth(12).unwrap()).unwrap();
+            let lending_market = Pubkey::from_str(&env::args().nth(13).unwrap()).unwrap();
+            let market_authority = Pubkey::from_str(&env::args().nth(14).unwrap()).unwrap();
+            let collateral_supply = Pubkey::from_str(&env::args().nth(15).unwrap()).unwrap();
+            let obligation_account = Pubkey::from_str(&env::args().nth(16).unwrap()).unwrap();
+            let pyth_account = Pubkey::from_str(&env::args().nth(17).unwrap()).unwrap();
+            let switchboard_account = Pubkey::from_str(&env::args().nth(18).unwrap()).unwrap();
+            vec![
+                Instruction::new_with_borsh(
+                    prog_id,
+                    &FluidityInstruction::Wrap(amount),
+                    vec![
+                        AccountMeta::new_readonly(spl_token::ID, false),
+                        AccountMeta::new(base_token_id, false),
+                        AccountMeta::new(fluidity_token_id, false),
+                        AccountMeta::new(pda_pubkey, false),
+                        AccountMeta::new(payer.pubkey(), true),
+                        AccountMeta::new(base_token_account, false),
+                        AccountMeta::new(fluidity_token_account, false),
+                        AccountMeta::new_readonly(solend_program, false),
+                        AccountMeta::new(pda_token_account, false),
+                        AccountMeta::new(collateral_account, false),
+                        AccountMeta::new(reserve, false),
+                        AccountMeta::new(reserve_liquidity_supply, false),
+                        AccountMeta::new(collateral_mint, false),
+                        AccountMeta::new(lending_market, false),
+                        AccountMeta::new_readonly(market_authority, false),
+                        AccountMeta::new(collateral_supply, false),
+                        AccountMeta::new(obligation_account, false),
+                        AccountMeta::new(pyth_account, false),
+                        AccountMeta::new(switchboard_account, false),
+                        AccountMeta::new_readonly(sysvar::clock::ID, false),
+                    ], 
+                ),
+            ]
         }
         "unwrap" => {
             let amount = env::args().nth(6).unwrap().parse::<u64>().unwrap();
@@ -87,7 +117,7 @@ fn test_smart_contract(client: &RpcClient) {
             let base_token_account = Pubkey::from_str(&env::args().nth(4).unwrap()).unwrap();
             let fluidity_token_account = Pubkey::from_str(&env::args().nth(5).unwrap()).unwrap();
             let pda_token_pubkey = spl_associated_token_account::get_associated_token_address(&pda_pubkey, &base_token_id);
-            Instruction::new_with_borsh(
+            vec![Instruction::new_with_borsh(
                 prog_id,
                 &FluidityInstruction::Unwrap(amount),
                 vec![AccountMeta::new_readonly(spl_token::ID, false),
@@ -99,22 +129,50 @@ fn test_smart_contract(client: &RpcClient) {
                     AccountMeta::new(base_token_account, false),
                     AccountMeta::new(fluidity_token_account, false),
                 ], 
-            )
+            )]
         }
         "createacc" => {
             let mint_pk = Pubkey::from_str(&env::args().nth(2).unwrap()).unwrap();
             let acc_pk = Pubkey::from_str(&env::args().nth(3).unwrap()).unwrap();
-            spl_associated_token_account::create_associated_token_account(
+            println!("creating account {}", spl_associated_token_account::get_associated_token_address(&acc_pk, &mint_pk));
+            vec![spl_associated_token_account::create_associated_token_account(
                 &payer.pubkey(),
                 &acc_pk,
                 &mint_pk,
-            )
+            )]
+        }
+        "initobligation" => {
+            let collateral_mint = Pubkey::from_str(&env::args().nth(2).unwrap()).unwrap();
+            let market_address = &env::args().nth(3).unwrap();
+            let solend_program = Pubkey::from_str(&env::args().nth(4).unwrap()).unwrap();
+            vec![
+                spl_associated_token_account::create_associated_token_account(
+                    &payer.pubkey(),
+                    &pda_pubkey,
+                    &collateral_mint
+                ),
+                Instruction::new_with_borsh(
+                    prog_id,
+                    &FluidityInstruction::InitSolendObligation(client.get_minimum_balance_for_rent_exemption(1300).unwrap(), 1300),
+                    vec![
+                        AccountMeta::new(payer.pubkey(), true),
+                        AccountMeta::new_readonly(solend_program, false),
+                        AccountMeta::new_readonly(system_program::ID, false),
+                        AccountMeta::new(Pubkey::create_with_seed(&pda_pubkey, &market_address[0..32], &solend_program).unwrap(), false),
+                        AccountMeta::new(Pubkey::from_str(market_address).unwrap(), false),
+                        AccountMeta::new(pda_pubkey, false),
+                        AccountMeta::new_readonly(sysvar::clock::ID, false),
+                        AccountMeta::new_readonly(sysvar::rent::ID, false),
+                        AccountMeta::new_readonly(spl_token::ID, false),
+                    ]
+                )
+            ]
         }
         _ => panic!("please provide a valid command (help, wrap, unwrap, createacc, printpdakey)")
     };
 
     // create and send txn to program
-    let mut txn = Transaction::new_with_payer(&[inst], Some(&payer.pubkey()));
+    let mut txn = Transaction::new_with_payer(&inst, Some(&payer.pubkey()));
     txn.sign(&[&payer], recent_blockhash);
     if let Err(e) = client.send_transaction(&txn) {
         if let solana_client::client_error::ClientErrorKind::RpcError(rpc_err) = e.kind {
@@ -139,7 +197,7 @@ fn test_smart_contract(client: &RpcClient) {
 
 fn main() {
     // connect to local testnet
-    let client = RpcClient::new("http://thorondir.bounceme.net:8899".to_string());
+    let client = RpcClient::new(env::var("SOLANA_NODE_ADDRESS").unwrap());
 
     // test smart contract functions
     test_smart_contract(&client);

@@ -9,7 +9,8 @@ use {
         program::{invoke_signed, invoke},
         pubkey::Pubkey,
         log::sol_log_compute_units,
-        system_instruction::transfer,
+        system_program,
+        system_instruction,
         instruction::{AccountMeta, Instruction},
         msg,
     },
@@ -23,49 +24,50 @@ enum FluidityInstruction {
     Wrap (u64),
     // unwrap fluid token
     Unwrap (u64),
-    // initialise solend accounts
-    CreateSolendAccounts,
+    // initialise solend obligation account
+    InitSolendObligation (u64, u64),
 }
 
 #[derive(BorshSerialize)]
 enum LendingInstruction {
-    InitLendingMarket {
-    },
+    InitLendingMarket,
 
-    SetLendingMarketOwner {
-    },
+    SetLendingMarketOwner,
 
     InitReserve,
 
     RefreshReserve,
 
-    DepositReserveLiquidity {
-    },
+    DepositReserveLiquidity,
 
-    RedeemReserveCollateral {
-    },
+    RedeemReserveCollateral,
 
+    // 6
+    /// Initializes a new lending market obligation.
+    ///
+    /// Accounts expected by this instruction:
+    ///
+    ///   0. `[writable]` Obligation account - uninitialized.
+    ///   1. `[]` Lending market account.
+    ///   2. `[signer]` Obligation owner.
+    ///   3. `[]` Clock sysvar.
+    ///   4. `[]` Rent sysvar.
+    ///   5. `[]` Token program id.
     InitObligation,
 
     RefreshObligation,
 
-    DepositObligationCollateral {
-    },
+    DepositObligationCollateral,
 
-    WithdrawObligationCollateral {
-    },
+    WithdrawObligationCollateral,
 
-    BorrowObligationLiquidity {
-    },
+    BorrowObligationLiquidity,
 
-    RepayObligationLiquidity {
-    },
+    RepayObligationLiquidity,
 
-    LiquidateObligation {
-    },
+    LiquidateObligation,
 
-    FlashLoan {
-    },
+    FlashLoan,
 
     // 14
     /// Combines DepositReserveLiquidity and DepositObligationCollateral
@@ -100,12 +102,11 @@ fn wrap(accounts: &[AccountInfo], amount: u64) -> ProgramResult {
     let token_mint = next_account_info(accounts_iter)?;
     let fluidity_mint = next_account_info(accounts_iter)?;
     let pda_account = next_account_info(accounts_iter)?;
-    let pda_token_account = next_account_info(accounts_iter)?;
     let sender = next_account_info(accounts_iter)?;
     let token_account = next_account_info(accounts_iter)?;
     let fluidity_account = next_account_info(accounts_iter)?;
     let solend_program = next_account_info(accounts_iter)?;
-    let source_liquidity_info = next_account_info(accounts_iter)?;
+    let pda_token_account = next_account_info(accounts_iter)?;
     let user_collateral_info = next_account_info(accounts_iter)?;
     let reserve_info = next_account_info(accounts_iter)?;
     let reserve_liquidity_supply_info = next_account_info(accounts_iter)?;
@@ -114,11 +115,9 @@ fn wrap(accounts: &[AccountInfo], amount: u64) -> ProgramResult {
     let lending_market_authority_info = next_account_info(accounts_iter)?;
     let destination_collateral_info = next_account_info(accounts_iter)?;
     let obligation_info = next_account_info(accounts_iter)?;
-    let obligation_owner_info = next_account_info(accounts_iter)?;
     let pyth_price_info = next_account_info(accounts_iter)?;
     let switchboard_feed_info = next_account_info(accounts_iter)?;
-    let user_transfer_authority_info = next_account_info(accounts_iter)?;
-    let clock = next_account_info(accounts_iter)?;
+    let clock_info = next_account_info(accounts_iter)?;
 
     invoke(
         &spl_token::instruction::transfer(
@@ -140,18 +139,18 @@ fn wrap(accounts: &[AccountInfo], amount: u64) -> ProgramResult {
                 AccountMeta::new(*reserve_info.key, false),
                 AccountMeta::new_readonly(*pyth_price_info.key, false),
                 AccountMeta::new_readonly(*switchboard_feed_info.key, false),
-                AccountMeta::new_readonly(*clock.key, false),
+                AccountMeta::new_readonly(*clock_info.key, false),
             ], 
         ),
-        &[reserve_info.clone(), pyth_price_info.clone(), switchboard_feed_info.clone(), clock.clone(), solend_program.clone()]
+        &[reserve_info.clone(), pyth_price_info.clone(), switchboard_feed_info.clone(), clock_info.clone(), solend_program.clone()]
     )?;
 
-    invoke(
+    invoke_signed(
         &Instruction::new_with_borsh(
             *solend_program.key,
             &LendingInstruction::DepositReserveLiquidityAndObligationCollateral{liquidity_amount: amount},
             vec![
-                AccountMeta::new(*source_liquidity_info.key, false),
+                AccountMeta::new(*pda_token_account.key, false),
                 AccountMeta::new(*user_collateral_info.key, false),
                 AccountMeta::new(*reserve_info.key, false),
                 AccountMeta::new(*reserve_liquidity_supply_info.key, false),
@@ -160,21 +159,22 @@ fn wrap(accounts: &[AccountInfo], amount: u64) -> ProgramResult {
                 AccountMeta::new_readonly(*lending_market_authority_info.key, false),
                 AccountMeta::new(*destination_collateral_info.key, false),
                 AccountMeta::new(*obligation_info.key, false),
-                AccountMeta::new(*obligation_owner_info.key, true),
+                AccountMeta::new(*pda_account.key, true),
                 AccountMeta::new_readonly(*pyth_price_info.key, false),
                 AccountMeta::new_readonly(*switchboard_feed_info.key, false),
-                AccountMeta::new(*user_transfer_authority_info.key, true),
-                AccountMeta::new_readonly(*clock.key, false),
+                AccountMeta::new(*pda_account.key, true),
+                AccountMeta::new_readonly(*clock_info.key, false),
                 AccountMeta::new_readonly(*token_program.key, false),
             ]
         ),
         &[
-            source_liquidity_info.clone(), user_collateral_info.clone(), reserve_info.clone(), reserve_liquidity_supply_info.clone(),
+            pda_token_account.clone(), user_collateral_info.clone(), reserve_info.clone(), reserve_liquidity_supply_info.clone(),
             reserve_collateral_mint_info.clone(), lending_market_info.clone(), lending_market_authority_info.clone(),
-            destination_collateral_info.clone(), obligation_info.clone(), obligation_owner_info.clone(), pyth_price_info.clone(),
-            switchboard_feed_info.clone(), user_transfer_authority_info.clone(), clock.clone(), token_program.clone(),
+            destination_collateral_info.clone(), obligation_info.clone(), pyth_price_info.clone(), pda_account.clone(),
+            switchboard_feed_info.clone(), sender.clone(), clock_info.clone(), token_program.clone(),
             solend_program.clone()
-        ]
+        ],
+        &[&[&b"FLU: MINT ACCOUNT"[..], &[255]]],
     )?;
 
     invoke_signed(
@@ -232,7 +232,51 @@ fn unwrap(accounts: &[AccountInfo], amount: u64) -> ProgramResult {
     Ok(())
 }
 
-fn create_solend_accounts(account: &[AccountInfo]) -> ProgramResult {
+fn init_solend_obligation(accounts: &[AccountInfo], obligation_lamports: u64, obligation_size: u64) -> ProgramResult {
+    let accounts_iter = &mut accounts.iter();
+    let payer = next_account_info(accounts_iter)?;
+    let solend_program_info = next_account_info(accounts_iter)?;
+    let system_program_info = next_account_info(accounts_iter)?;
+    // init obligation infos
+    let obligation_info = next_account_info(accounts_iter)?;
+    let lending_market_info = next_account_info(accounts_iter)?;
+    let obligation_owner_info = next_account_info(accounts_iter)?;
+    let clock_info = next_account_info(accounts_iter)?;
+    let rent_info = next_account_info(accounts_iter)?;
+    let token_program_id = next_account_info(accounts_iter)?;
+
+    invoke_signed(
+        &system_instruction::create_account_with_seed(
+            &payer.key,
+            &obligation_info.key,
+            &obligation_owner_info.key,
+            &lending_market_info.key.to_string()[0..32],
+            obligation_lamports,
+            obligation_size,
+            &solend_program_info.key,
+        ),
+        &[payer.clone(), obligation_info.clone(), obligation_owner_info.clone(), lending_market_info.clone(), solend_program_info.clone(), system_program_info.clone()],
+        &[&[&b"FLU: MINT ACCOUNT"[..], &[255]]],
+    )?;
+
+    invoke_signed(
+        &Instruction::new_with_borsh(
+            *solend_program_info.key,
+            &LendingInstruction::InitObligation,
+            vec![
+                AccountMeta::new(*obligation_info.key, false),
+                AccountMeta::new(*lending_market_info.key, false),
+                AccountMeta::new(*obligation_owner_info.key, true),
+                AccountMeta::new_readonly(*clock_info.key, false),
+                AccountMeta::new_readonly(*rent_info.key, false),
+                AccountMeta::new_readonly(*token_program_id.key, false)
+            ]
+        ),
+        &[obligation_info.clone(), lending_market_info.clone(), obligation_owner_info.clone(),
+          clock_info.clone(), rent_info.clone(), token_program_id.clone(), solend_program_info.clone()],
+        &[&[&b"FLU: MINT ACCOUNT"[..], &[255]]],
+    )?;
+    
     Ok(())
 }
 
@@ -244,6 +288,9 @@ pub fn process(_program_id: &Pubkey, accounts: &[AccountInfo], input: &[u8]) -> 
         }
         FluidityInstruction::Unwrap (amount) => {
             return unwrap(&accounts, amount);
+        }
+        FluidityInstruction::InitSolendObligation (obligation_lamports, obligation_size) => {
+            return init_solend_obligation(&accounts, obligation_lamports, obligation_size);
         }
     };
 }
