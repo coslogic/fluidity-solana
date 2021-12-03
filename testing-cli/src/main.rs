@@ -64,23 +64,40 @@ fn test_smart_contract(client: &RpcClient) {
     // select and create instruction
     let inst = match command.as_str() {
         "wrap" => {
-            let amount = env::args().nth(2).unwrap().parse::<u64>().unwrap();
-            let base_token_id = Pubkey::from_str(&env::args().nth(3).unwrap()).unwrap();
-            let fluidity_token_id = Pubkey::from_str(&env::args().nth(4).unwrap()).unwrap();
-            let base_token_account = Pubkey::from_str(&env::args().nth(5).unwrap()).unwrap();
-            let fluidity_token_account = Pubkey::from_str(&env::args().nth(6).unwrap()).unwrap();
-            let solend_program = Pubkey::from_str(&env::args().nth(7).unwrap()).unwrap();
-            let pda_token_account = Pubkey::from_str(&env::args().nth(8).unwrap()).unwrap();
-            let collateral_account = Pubkey::from_str(&env::args().nth(9).unwrap()).unwrap();
-            let reserve = Pubkey::from_str(&env::args().nth(10).unwrap()).unwrap();
-            let reserve_liquidity_supply = Pubkey::from_str(&env::args().nth(11).unwrap()).unwrap();
-            let collateral_mint = Pubkey::from_str(&env::args().nth(12).unwrap()).unwrap();
-            let lending_market = Pubkey::from_str(&env::args().nth(13).unwrap()).unwrap();
-            let market_authority = Pubkey::from_str(&env::args().nth(14).unwrap()).unwrap();
-            let collateral_supply = Pubkey::from_str(&env::args().nth(15).unwrap()).unwrap();
-            let obligation_account = Pubkey::from_str(&env::args().nth(16).unwrap()).unwrap();
-            let pyth_account = Pubkey::from_str(&env::args().nth(17).unwrap()).unwrap();
-            let switchboard_account = Pubkey::from_str(&env::args().nth(18).unwrap()).unwrap();
+            let amount =
+                env::args().nth(2).unwrap().parse::<u64>().unwrap();
+            let base_token_id =
+                Pubkey::from_str(&env::args().nth(3).unwrap()).unwrap();
+            let fluidity_token_id =
+                Pubkey::from_str(&env::args().nth(4).unwrap()).unwrap();
+            let base_token_account =
+                Pubkey::from_str(&env::args().nth(5).unwrap()).unwrap();
+            let pda_token_account =
+                Pubkey::from_str(&env::args().nth(6).unwrap()).unwrap();
+            let fluidity_token_account =
+                Pubkey::from_str(&env::args().nth(7).unwrap()).unwrap();
+            let solend_program =
+                Pubkey::from_str(&env::args().nth(8).unwrap()).unwrap();
+            let collateral_account =
+                Pubkey::from_str(&env::args().nth(9).unwrap()).unwrap();
+            let reserve =
+                Pubkey::from_str(&env::args().nth(10).unwrap()).unwrap();
+            let reserve_liquidity_supply =
+                Pubkey::from_str(&env::args().nth(11).unwrap()).unwrap();
+            let collateral_mint =
+                Pubkey::from_str(&env::args().nth(12).unwrap()).unwrap();
+            let lending_market =
+                Pubkey::from_str(&env::args().nth(13).unwrap()).unwrap();
+            let market_authority =
+                Pubkey::from_str(&env::args().nth(14).unwrap()).unwrap();
+            let collateral_supply =
+                Pubkey::from_str(&env::args().nth(15).unwrap()).unwrap();
+            let obligation_account =
+                Pubkey::from_str(&env::args().nth(16).unwrap()).unwrap();
+            let pyth_account =
+                Pubkey::from_str(&env::args().nth(17).unwrap()).unwrap();
+            let switchboard_account =
+                Pubkey::from_str(&env::args().nth(18).unwrap()).unwrap();
             vec![
                 Instruction::new_with_borsh(
                     prog_id,
@@ -92,9 +109,9 @@ fn test_smart_contract(client: &RpcClient) {
                         AccountMeta::new(pda_pubkey, false),
                         AccountMeta::new(payer.pubkey(), true),
                         AccountMeta::new(base_token_account, false),
+                        AccountMeta::new(pda_token_account, false),
                         AccountMeta::new(fluidity_token_account, false),
                         AccountMeta::new_readonly(solend_program, false),
-                        AccountMeta::new(pda_token_account, false),
                         AccountMeta::new(collateral_account, false),
                         AccountMeta::new(reserve, false),
                         AccountMeta::new(reserve_liquidity_supply, false),
@@ -111,23 +128,74 @@ fn test_smart_contract(client: &RpcClient) {
             ]
         }
         "unwrap" => {
-            let amount = env::args().nth(6).unwrap().parse::<u64>().unwrap();
-            let base_token_id = Pubkey::from_str(&env::args().nth(2).unwrap()).unwrap();
-            let fluidity_token_id = Pubkey::from_str(&env::args().nth(3).unwrap()).unwrap();
-            let base_token_account = Pubkey::from_str(&env::args().nth(4).unwrap()).unwrap();
-            let fluidity_token_account = Pubkey::from_str(&env::args().nth(5).unwrap()).unwrap();
-            let pda_token_pubkey = spl_associated_token_account::get_associated_token_address(&pda_pubkey, &base_token_id);
+            let amount =
+                env::args().nth(2).unwrap().parse::<u64>().unwrap();
+            let base_token_id =
+                Pubkey::from_str(&env::args().nth(3).unwrap()).unwrap();
+            let fluidity_token_id =
+                Pubkey::from_str(&env::args().nth(4).unwrap()).unwrap();
+            let base_token_account =
+                Pubkey::from_str(&env::args().nth(5).unwrap()).unwrap();
+            let fluidity_token_account =
+                Pubkey::from_str(&env::args().nth(6).unwrap()).unwrap();
+            let solend_program =
+                Pubkey::from_str(&env::args().nth(7).unwrap()).unwrap();
+            let destination_collateral =
+                Pubkey::from_str(&env::args().nth(8).unwrap()).unwrap();
+            let user_collateral =
+                Pubkey::from_str(&env::args().nth(9).unwrap()).unwrap();
+            let withdraw_reserve =
+                Pubkey::from_str(&env::args().nth(10).unwrap()).unwrap();
+            let obligation =
+                Pubkey::from_str(&env::args().nth(11).unwrap()).unwrap();
+            let lending_market =
+                Pubkey::from_str(&env::args().nth(12).unwrap()).unwrap();
+            let lending_market_authority =
+                Pubkey::from_str(&env::args().nth(13).unwrap()).unwrap();
+            let reserve_collateral_mint =
+                Pubkey::from_str(&env::args().nth(14).unwrap()).unwrap();
+            let reserve_liquidity_supply =
+                Pubkey::from_str(&env::args().nth(15).unwrap()).unwrap();
+            let withdraw_pyth_price =
+                Pubkey::from_str(&env::args().nth(16).unwrap()).unwrap(); 
+            let withdraw_switchboard_feed =
+                Pubkey::from_str(&env::args().nth(17).unwrap()).unwrap(); 
+            let deposit_reserve =
+                Pubkey::from_str(&env::args().nth(18).unwrap()).unwrap(); 
+            let deposit_pyth_price =
+                Pubkey::from_str(&env::args().nth(19).unwrap()).unwrap(); 
+            let deposit_switchboard_feed =
+                Pubkey::from_str(&env::args().nth(20).unwrap()).unwrap(); 
+            let pda_token_pubkey =
+                spl_associated_token_account::get_associated_token_address(&pda_pubkey, &base_token_id);
+
             vec![Instruction::new_with_borsh(
                 prog_id,
                 &FluidityInstruction::Unwrap(amount),
-                vec![AccountMeta::new_readonly(spl_token::ID, false),
+                vec![
+                    AccountMeta::new_readonly(spl_token::ID, false),
                     AccountMeta::new(base_token_id, false),
                     AccountMeta::new(fluidity_token_id, false),
                     AccountMeta::new(pda_pubkey, false),
-                    AccountMeta::new(pda_token_pubkey, false),
                     AccountMeta::new(payer.pubkey(), true),
                     AccountMeta::new(base_token_account, false),
+                    AccountMeta::new(pda_token_pubkey, false),
                     AccountMeta::new(fluidity_token_account, false),
+                    AccountMeta::new_readonly(solend_program, false),
+                    AccountMeta::new(destination_collateral, false),
+                    AccountMeta::new(user_collateral, false),
+                    AccountMeta::new(withdraw_reserve, false),
+                    AccountMeta::new(obligation, false),
+                    AccountMeta::new(lending_market, false),
+                    AccountMeta::new_readonly(lending_market_authority, false),
+                    AccountMeta::new(reserve_collateral_mint, false),
+                    AccountMeta::new(reserve_liquidity_supply, false),
+                    AccountMeta::new_readonly(withdraw_pyth_price, false),
+                    AccountMeta::new_readonly(withdraw_switchboard_feed, false),
+                    AccountMeta::new(deposit_reserve, false),
+                    AccountMeta::new_readonly(deposit_pyth_price, false),
+                    AccountMeta::new_readonly(deposit_switchboard_feed, false),
+                    AccountMeta::new_readonly(sysvar::clock::ID, false),
                 ], 
             )]
         }
