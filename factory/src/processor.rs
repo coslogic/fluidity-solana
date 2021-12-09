@@ -1,6 +1,7 @@
 // Fluidity smart contract state processor
 
 use {
+    std::str::FromStr,
     borsh::{BorshDeserialize, BorshSerialize},
     solana_program::{
         account_info::{next_account_info, AccountInfo},
@@ -20,11 +21,13 @@ use {
 #[derive(BorshDeserialize, BorshSerialize, Debug, PartialEq, Clone)]
 enum FluidityInstruction {
     // wrap fluid token
-    Wrap(u64),
+    Wrap(u64, String, u8),
     // unwrap fluid token
-    Unwrap(u64),
+    Unwrap(u64, String, u8),
+    // payout two accounts
+    Payout (u64),
     // initialise solend obligation account
-    InitSolendObligation(u64, u64),
+    InitSolendObligation(u64, u64, String, u8),
 }
 
 #[derive(BorshSerialize)]
@@ -119,7 +122,7 @@ enum LendingInstruction {
     },
 }
 
-fn wrap(accounts: &[AccountInfo], amount: u64) -> ProgramResult {
+fn wrap(accounts: &[AccountInfo], amount: u64, seed: String, bump: u8) -> ProgramResult {
     let accounts_iter = &mut accounts.iter();
     let token_program = next_account_info(accounts_iter)?;
     let token_mint = next_account_info(accounts_iter)?;
@@ -141,6 +144,9 @@ fn wrap(accounts: &[AccountInfo], amount: u64) -> ProgramResult {
     let pyth_price_info = next_account_info(accounts_iter)?;
     let switchboard_feed_info = next_account_info(accounts_iter)?;
     let clock_info = next_account_info(accounts_iter)?;
+
+    // make sure the base and fluid token match
+    check_mints_and_pda(*token_mint.key, *fluidity_mint.key, *pda_account.key);
 
     invoke(
         &spl_token::instruction::transfer(
@@ -197,12 +203,12 @@ fn wrap(accounts: &[AccountInfo], amount: u64) -> ProgramResult {
             switchboard_feed_info.clone(), sender.clone(), clock_info.clone(), token_program.clone(),
             solend_program.clone()
         ],
-        &[&[&b"FLU: MINT ACCOUNT"[..], &[255]]],
+        &[&[&seed.as_bytes(), &[bump]]],
     )?;
 
     invoke_signed(
         &spl_token::instruction::mint_to(
-            &token_program.key,
+           &token_program.key,
             &fluidity_mint.key,
             &fluidity_account.key,
             &pda_account.key,
@@ -210,13 +216,13 @@ fn wrap(accounts: &[AccountInfo], amount: u64) -> ProgramResult {
             amount,
         ).unwrap(),
         &[fluidity_mint.clone(), fluidity_account.clone(), pda_account.clone(), token_program.clone()],
-        &[&[&b"FLU: MINT ACCOUNT"[..], &[255]]],
+        &[&[&seed.as_bytes(), &[bump]]],
     )?;
 
     Ok(())
 }
 
-fn unwrap(accounts: &[AccountInfo], amount: u64) -> ProgramResult {
+fn unwrap(accounts: &[AccountInfo], amount: u64, seed: String, bump: u8) -> ProgramResult {
     let accounts_iter = &mut accounts.iter();
     let token_program = next_account_info(accounts_iter)?;
     let token_mint = next_account_info(accounts_iter)?;
@@ -237,10 +243,10 @@ fn unwrap(accounts: &[AccountInfo], amount: u64) -> ProgramResult {
     let reserve_liquidity_supply_info = next_account_info(accounts_iter)?;
     let withdraw_pyth_price_info = next_account_info(accounts_iter)?;
     let withdraw_switchboard_feed_info = next_account_info(accounts_iter)?;
-    let deposit_reserve_info = next_account_info(accounts_iter)?;
-    let deposit_pyth_price_info = next_account_info(accounts_iter)?;
-    let deposit_switchboard_feed_info = next_account_info(accounts_iter)?;
     let clock_info = next_account_info(accounts_iter)?;
+
+    // make sure the base and fluid token match
+    check_mints_and_pda(*token_mint.key, *fluidity_mint.key, *pda_account.key);
 
     invoke(
         &spl_token::instruction::burn(
@@ -279,27 +285,6 @@ fn unwrap(accounts: &[AccountInfo], amount: u64) -> ProgramResult {
         ],
     )?;
 
-    /*
-    invoke(
-        &Instruction::new_with_borsh(
-            *solend_program.key,
-            &LendingInstruction::RefreshReserve,
-            vec![
-                AccountMeta::new(*deposit_reserve_info.key, false),
-                AccountMeta::new_readonly(*deposit_pyth_price_info.key, false),
-                AccountMeta::new_readonly(*deposit_switchboard_feed_info.key, false),
-                AccountMeta::new_readonly(*clock_info.key, false),
-            ],
-        ),
-        &[
-            deposit_reserve_info.clone(),
-            deposit_pyth_price_info.clone(),
-            deposit_switchboard_feed_info.clone(),
-            clock_info.clone(),
-            solend_program.clone(),
-        ],
-    )?;*/
-
     invoke(
         &Instruction::new_with_borsh(
             *solend_program.key,
@@ -314,7 +299,6 @@ fn unwrap(accounts: &[AccountInfo], amount: u64) -> ProgramResult {
             obligation_info.clone(),
             clock_info.clone(),
             withdraw_reserve_info.clone(),
-            deposit_reserve_info.clone(),
             solend_program.clone(),
         ],
     )?;
@@ -356,7 +340,7 @@ fn unwrap(accounts: &[AccountInfo], amount: u64) -> ProgramResult {
             token_program.clone(),
             solend_program.clone(),
         ],
-        &[&[&b"FLU: MINT ACCOUNT"[..], &[255]]],
+        &[&[&seed.as_bytes(), &[bump]]],
     )?;
 
     invoke_signed(
@@ -375,6 +359,72 @@ fn unwrap(accounts: &[AccountInfo], amount: u64) -> ProgramResult {
             pda_account.clone(),
             token_program.clone(),
         ],
+        &[&[&seed.as_bytes(), &[bump]]],
+    )?;
+
+    Ok(())
+}
+
+fn check_mints_and_pda(token_mint: Pubkey, fluid_mint: Pubkey, pda: Pubkey) {
+    let TOKEN_TO_FLUID_MAP = [
+        (
+            Pubkey::from_str("zVzi5VAf4qMEwzv7NXECVx5v2pQ7xnqVVjCXZwS9XzA").unwrap(),
+            Pubkey::from_str("4NYFTmvWY1EjqzEfr7t41ey9HkoYV133CWfQq18qCXAE").unwrap(),
+            Pubkey::from_str("GUmgGM3MQvtHM3B7vhKxfvvTM8Rvp5aF2js4ZjcH2ZoR").unwrap(),
+        ),
+        (
+            Pubkey::from_str("Bp2nLuamFZndE7gztA1iPsNVhdJeg9xfKdq7KmvjpGoP").unwrap(),
+            Pubkey::from_str("EE6KL24UqgerwbjrWqU3Cm8V4kUbCTuvhyTJqmYJKqJj").unwrap(),
+            Pubkey::from_str("CgfqRZmjUsLaUCgrdrBmotwjDQxFWWxhkBHwCdR6kPQm").unwrap()
+        ),
+    ];
+
+    if let Some((t, m ,p)) = TOKEN_TO_FLUID_MAP.iter().filter(|x| x.0 == token_mint).nth(0) {
+        if (t, m, p) != (&token_mint, &fluid_mint, &pda) {
+            panic!("invalid token pair!");
+        }
+    } else {
+        panic!("unkown token!");
+    }
+
+}
+
+fn payout(accounts: &[AccountInfo], amount: u64) -> ProgramResult {
+    let accounts_iter = &mut accounts.iter();
+    let token_program = next_account_info(accounts_iter)?;
+    let fluidity_mint = next_account_info(accounts_iter)?;
+    let pda_account = next_account_info(accounts_iter)?;
+    let payout_account_a = next_account_info(accounts_iter)?;
+    let payout_account_b = next_account_info(accounts_iter)?;
+    let payer = next_account_info(accounts_iter)?;
+
+    if !(payer.is_signer && payer.key == &Pubkey::from_str("sohTpNitFg3WZeEcbrMunnwoZJWP4t8yisPB5o3DGD5").unwrap()) {
+        panic!("bad payout authority!");
+    }
+
+    invoke_signed(
+        &spl_token::instruction::mint_to(
+            &token_program.key,
+            &fluidity_mint.key,
+            &payout_account_a.key,
+            &pda_account.key,
+            &[&pda_account.key],
+            amount,
+        ).unwrap(),
+        &[fluidity_mint.clone(), payout_account_a.clone(), pda_account.clone(), token_program.clone()],
+        &[&[&b"FLU: MINT ACCOUNT"[..], &[255]]],
+    )?;
+
+    invoke_signed(
+        &spl_token::instruction::mint_to(
+            &token_program.key,
+            &fluidity_mint.key,
+            &payout_account_b.key,
+            &pda_account.key,
+            &[&pda_account.key],
+            amount,
+        ).unwrap(),
+        &[fluidity_mint.clone(), payout_account_b.clone(), pda_account.clone(), token_program.clone()],
         &[&[&b"FLU: MINT ACCOUNT"[..], &[255]]],
     )?;
 
@@ -385,6 +435,8 @@ fn init_solend_obligation(
     accounts: &[AccountInfo],
     obligation_lamports: u64,
     obligation_size: u64,
+    seed: String,
+    bump: u8,
 ) -> ProgramResult {
     let accounts_iter = &mut accounts.iter();
     let payer = next_account_info(accounts_iter)?;
@@ -409,7 +461,7 @@ fn init_solend_obligation(
             &solend_program_info.key,
         ),
         &[payer.clone(), obligation_info.clone(), obligation_owner_info.clone(), lending_market_info.clone(), solend_program_info.clone(), system_program_info.clone()],
-        &[&[&b"FLU: MINT ACCOUNT"[..], &[255]]],
+        &[&[&seed.as_bytes(), &[bump]]],
     )?;
 
     invoke_signed(
@@ -427,7 +479,7 @@ fn init_solend_obligation(
         ),
         &[obligation_info.clone(), lending_market_info.clone(), obligation_owner_info.clone(),
           clock_info.clone(), rent_info.clone(), token_program_id.clone(), solend_program_info.clone()],
-        &[&[&b"FLU: MINT ACCOUNT"[..], &[255]]],
+        &[&[&seed.as_bytes(), &[bump]]],
     )?;
 
     Ok(())
@@ -436,14 +488,17 @@ fn init_solend_obligation(
 pub fn process(_program_id: &Pubkey, accounts: &[AccountInfo], input: &[u8]) -> ProgramResult {
     let instruction = FluidityInstruction::try_from_slice(input)?;
     match instruction {
-        FluidityInstruction::Wrap(amount) => {
-            return wrap(&accounts, amount);
+        FluidityInstruction::Wrap(amount, seed, bump) => {
+            return wrap(&accounts, amount, seed, bump);
         }
-        FluidityInstruction::Unwrap(amount) => {
-            return unwrap(&accounts, amount);
+        FluidityInstruction::Unwrap(amount, seed, bump) => {
+            return unwrap(&accounts, amount, seed, bump);
         }
-        FluidityInstruction::InitSolendObligation(obligation_lamports, obligation_size) => {
-            return init_solend_obligation(&accounts, obligation_lamports, obligation_size);
+        FluidityInstruction::Payout (amount) => {
+            return payout(&accounts, amount);
+        }
+        FluidityInstruction::InitSolendObligation(obligation_lamports, obligation_size, seed, bump) => {
+            return init_solend_obligation(&accounts, obligation_lamports, obligation_size, seed, bump);
         }
     };
 }
