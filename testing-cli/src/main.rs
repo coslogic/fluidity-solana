@@ -1,5 +1,4 @@
 use solana_client::client_error::reqwest::blocking::Response;
-pub mod reserve;
 
 use {
     std::env,
@@ -236,6 +235,18 @@ fn test_smart_contract(client: &RpcClient) {
             ]
         }
         "logtvl" => {
+            let obligation = Pubkey::from_str(&env::args().nth(3).unwrap()).unwrap();
+            let reserve = Pubkey::from_str(&env::args().nth(4).unwrap()).unwrap();
+            vec![
+                Instruction::new_with_borsh(
+                    prog_id,
+                    &FluidityInstruction::LogTVL,
+                    vec![
+                        AccountMeta::new_readonly(obligation, false),
+                        AccountMeta::new_readonly(reserve, false),
+                    ]
+                )
+            ]
         }
         _ => panic!("please provide a valid command (help, wrap, unwrap, createacc, printpdakey)")
     };

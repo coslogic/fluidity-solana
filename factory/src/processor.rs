@@ -498,8 +498,8 @@ pub fn log_tvl(accounts: &[AccountInfo]) -> ProgramResult {
     let reserve_info = next_account_info(accounts_iter)?;
 
     let obligation = Obligation::unpack(&obligation_info.data.borrow())?;
-    let reserve = Reserve::unpack(&reserve_info.data.borrow())?;
     msg!("{:?}", &obligation.deposits);
+    let reserve = Reserve::unpack(&reserve_info.data.borrow())?;
     msg!("{:?}", reserve.collateral_exchange_rate()?);
 
     Ok(())

@@ -140,6 +140,7 @@ impl Reserve {
         &self,
         amount_to_borrow: u64,
         max_borrow_value: Decimal,
+        remaining_reserve_borrow: Decimal,
     ) -> Result<CalculateBorrowResult, ProgramError> {
         // @TODO: add lookup table https://git.io/JOCYq
         let decimals = 10u64
@@ -149,6 +150,7 @@ impl Reserve {
             let borrow_amount = max_borrow_value
                 .try_mul(decimals)?
                 .try_div(self.liquidity.market_price)?
+                .min(remaining_reserve_borrow)
                 .min(self.liquidity.available_amount.into());
             let (borrow_fee, host_fee) = self
                 .config
@@ -353,10 +355,10 @@ pub struct ReserveLiquidity {
     pub mint_decimals: u8,
     /// Reserve liquidity supply address
     pub supply_pubkey: Pubkey,
-    /// Reserve liquidity fee receiver address
-    pub fee_receiver: Pubkey,
-    /// Reserve liquidity oracle account
-    pub oracle_pubkey: Pubkey,
+    /// Reserve liquidity pyth oracle account
+    pub pyth_oracle_pubkey: Pubkey,
+    /// Reserve liquidity switchboard oracle account
+    pub switchboard_oracle_pubkey: Pubkey,
     /// Reserve liquidity available
     pub available_amount: u64,
     /// Reserve liquidity borrowed
@@ -374,8 +376,8 @@ impl ReserveLiquidity {
             mint_pubkey: params.mint_pubkey,
             mint_decimals: params.mint_decimals,
             supply_pubkey: params.supply_pubkey,
-            fee_receiver: params.fee_receiver,
-            oracle_pubkey: params.oracle_pubkey,
+            pyth_oracle_pubkey: params.pyth_oracle_pubkey,
+            switchboard_oracle_pubkey: params.switchboard_oracle_pubkey,
             available_amount: 0,
             borrowed_amount_wads: Decimal::zero(),
             cumulative_borrow_rate_wads: Decimal::one(),
@@ -433,7 +435,8 @@ impl ReserveLiquidity {
             .available_amount
             .checked_add(repay_amount)
             .ok_or(LendingError::MathOverflow)?;
-        self.borrowed_amount_wads = self.borrowed_amount_wads.try_sub(settle_amount)?;
+        let safe_settle_amount = settle_amount.min(self.borrowed_amount_wads);
+        self.borrowed_amount_wads = self.borrowed_amount_wads.try_sub(safe_settle_amount)?;
 
         Ok(())
     }
@@ -475,10 +478,10 @@ pub struct NewReserveLiquidityParams {
     pub mint_decimals: u8,
     /// Reserve liquidity supply address
     pub supply_pubkey: Pubkey,
-    /// Reserve liquidity fee receiver address
-    pub fee_receiver: Pubkey,
-    /// Reserve liquidity oracle account
-    pub oracle_pubkey: Pubkey,
+    /// Reserve liquidity pyth oracle account
+    pub pyth_oracle_pubkey: Pubkey,
+    /// Reserve liquidity switchboard oracle account
+    pub switchboard_oracle_pubkey: Pubkey,
     /// Reserve liquidity market price in quote currency
     pub market_price: Decimal,
 }
@@ -553,9 +556,8 @@ pub struct CollateralExchangeRate(Rate);
 impl CollateralExchangeRate {
     /// Convert reserve collateral to liquidity
     pub fn collateral_to_liquidity(&self, collateral_amount: u64) -> Result<u64, ProgramError> {
-        Decimal::from(collateral_amount)
-            .try_div(self.0)?
-            .try_round_u64()
+        self.decimal_collateral_to_liquidity(collateral_amount.into())?
+            .try_floor_u64()
     }
 
     /// Convert reserve collateral to liquidity
@@ -568,7 +570,8 @@ impl CollateralExchangeRate {
 
     /// Convert reserve liquidity to collateral
     pub fn liquidity_to_collateral(&self, liquidity_amount: u64) -> Result<u64, ProgramError> {
-        self.0.try_mul(liquidity_amount)?.try_round_u64()
+        self.decimal_liquidity_to_collateral(liquidity_amount.into())?
+            .try_floor_u64()
     }
 
     /// Convert reserve liquidity to collateral
@@ -606,6 +609,12 @@ pub struct ReserveConfig {
     pub max_borrow_rate: u8,
     /// Program owner fees assessed, separate from gains due to interest accrual
     pub fees: ReserveFees,
+    /// Maximum deposit limit of liquidity in native units, u64::MAX for inf
+    pub deposit_limit: u64,
+    /// Borrows disabled
+    pub borrow_limit: u64,
+    /// Reserve liquidity fee receiver address
+    pub fee_receiver: Pubkey,
 }
 
 /// Additional fee information on a reserve
@@ -662,9 +671,9 @@ impl ReserveFees {
         if borrow_fee_rate > Rate::zero() && amount > Decimal::zero() {
             let need_to_assess_host_fee = host_fee_rate > Rate::zero();
             let minimum_fee = if need_to_assess_host_fee {
-                2 // 1 token to owner, 1 to host
+                2u64 // 1 token to owner, 1 to host
             } else {
-                1 // 1 token to owner, nothing else
+                1u64 // 1 token to owner, nothing else
             };
 
             let borrow_fee_amount = match fee_calculation {
@@ -678,14 +687,18 @@ impl ReserveFees {
                 }
             };
 
-            let borrow_fee = borrow_fee_amount.try_round_u64()?.max(minimum_fee);
-            if Decimal::from(borrow_fee) >= amount {
+            let borrow_fee_decimal = borrow_fee_amount.max(minimum_fee.into());
+            if borrow_fee_decimal >= amount {
                 msg!("Borrow amount is too small to receive liquidity after fees");
                 return Err(LendingError::BorrowTooSmall.into());
             }
 
+            let borrow_fee = borrow_fee_decimal.try_round_u64()?;
             let host_fee = if need_to_assess_host_fee {
-                host_fee_rate.try_mul(borrow_fee)?.try_round_u64()?.max(1)
+                borrow_fee_decimal
+                    .try_mul(host_fee_rate)?
+                    .try_round_u64()?
+                    .max(1u64)
             } else {
                 0
             };
@@ -712,7 +725,7 @@ impl IsInitialized for Reserve {
     }
 }
 
-const RESERVE_LEN: usize = 571; // 1 + 8 + 1 + 32 + 32 + 1 + 32 + 32 + 32 + 8 + 16 + 16 + 16 + 32 + 8 + 32 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 8 + 8 + 1 + 248
+const RESERVE_LEN: usize = 619; // 1 + 8 + 1 + 32 + 32 + 1 + 32 + 32 + 32 + 8 + 16 + 16 + 16 + 32 + 8 + 32 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 8 + 8 + 1 + 8 + 8 + 32 + 248
 impl Pack for Reserve {
     const LEN: usize = RESERVE_LEN;
 
@@ -728,8 +741,8 @@ impl Pack for Reserve {
             liquidity_mint_pubkey,
             liquidity_mint_decimals,
             liquidity_supply_pubkey,
-            liquidity_fee_receiver,
-            liquidity_oracle_pubkey,
+            liquidity_pyth_oracle_pubkey,
+            liquidity_switchboard_oracle_pubkey,
             liquidity_available_amount,
             liquidity_borrowed_amount_wads,
             liquidity_cumulative_borrow_rate_wads,
@@ -747,6 +760,9 @@ impl Pack for Reserve {
             config_fees_borrow_fee_wad,
             config_fees_flash_loan_fee_wad,
             config_fees_host_fee_percentage,
+            config_deposit_limit,
+            config_borrow_limit,
+            config_fee_receiver,
             _padding,
         ) = mut_array_refs![
             output,
@@ -776,6 +792,9 @@ impl Pack for Reserve {
             8,
             8,
             1,
+            8,
+            8,
+            PUBKEY_BYTES,
             248
         ];
 
@@ -789,8 +808,9 @@ impl Pack for Reserve {
         liquidity_mint_pubkey.copy_from_slice(self.liquidity.mint_pubkey.as_ref());
         *liquidity_mint_decimals = self.liquidity.mint_decimals.to_le_bytes();
         liquidity_supply_pubkey.copy_from_slice(self.liquidity.supply_pubkey.as_ref());
-        liquidity_fee_receiver.copy_from_slice(self.liquidity.fee_receiver.as_ref());
-        liquidity_oracle_pubkey.copy_from_slice(self.liquidity.oracle_pubkey.as_ref());
+        liquidity_pyth_oracle_pubkey.copy_from_slice(self.liquidity.pyth_oracle_pubkey.as_ref());
+        liquidity_switchboard_oracle_pubkey
+            .copy_from_slice(self.liquidity.switchboard_oracle_pubkey.as_ref());
         *liquidity_available_amount = self.liquidity.available_amount.to_le_bytes();
         pack_decimal(
             self.liquidity.borrowed_amount_wads,
@@ -818,6 +838,9 @@ impl Pack for Reserve {
         *config_fees_borrow_fee_wad = self.config.fees.borrow_fee_wad.to_le_bytes();
         *config_fees_flash_loan_fee_wad = self.config.fees.flash_loan_fee_wad.to_le_bytes();
         *config_fees_host_fee_percentage = self.config.fees.host_fee_percentage.to_le_bytes();
+        *config_deposit_limit = self.config.deposit_limit.to_le_bytes();
+        *config_borrow_limit = self.config.borrow_limit.to_le_bytes();
+        config_fee_receiver.copy_from_slice(self.config.fee_receiver.as_ref());
     }
 
     /// Unpacks a byte buffer into a [ReserveInfo](struct.ReserveInfo.html).
@@ -832,8 +855,8 @@ impl Pack for Reserve {
             liquidity_mint_pubkey,
             liquidity_mint_decimals,
             liquidity_supply_pubkey,
-            liquidity_fee_receiver,
-            liquidity_oracle_pubkey,
+            liquidity_pyth_oracle_pubkey,
+            liquidity_switchboard_oracle_pubkey,
             liquidity_available_amount,
             liquidity_borrowed_amount_wads,
             liquidity_cumulative_borrow_rate_wads,
@@ -851,6 +874,9 @@ impl Pack for Reserve {
             config_fees_borrow_fee_wad,
             config_fees_flash_loan_fee_wad,
             config_fees_host_fee_percentage,
+            config_deposit_limit,
+            config_borrow_limit,
+            config_fee_receiver,
             _padding,
         ) = array_refs![
             input,
@@ -880,6 +906,9 @@ impl Pack for Reserve {
             8,
             8,
             1,
+            8,
+            8,
+            PUBKEY_BYTES,
             248
         ];
 
@@ -900,8 +929,10 @@ impl Pack for Reserve {
                 mint_pubkey: Pubkey::new_from_array(*liquidity_mint_pubkey),
                 mint_decimals: u8::from_le_bytes(*liquidity_mint_decimals),
                 supply_pubkey: Pubkey::new_from_array(*liquidity_supply_pubkey),
-                fee_receiver: Pubkey::new_from_array(*liquidity_fee_receiver),
-                oracle_pubkey: Pubkey::new_from_array(*liquidity_oracle_pubkey),
+                pyth_oracle_pubkey: Pubkey::new_from_array(*liquidity_pyth_oracle_pubkey),
+                switchboard_oracle_pubkey: Pubkey::new_from_array(
+                    *liquidity_switchboard_oracle_pubkey,
+                ),
                 available_amount: u64::from_le_bytes(*liquidity_available_amount),
                 borrowed_amount_wads: unpack_decimal(liquidity_borrowed_amount_wads),
                 cumulative_borrow_rate_wads: unpack_decimal(liquidity_cumulative_borrow_rate_wads),
@@ -925,6 +956,9 @@ impl Pack for Reserve {
                     flash_loan_fee_wad: u64::from_le_bytes(*config_fees_flash_loan_fee_wad),
                     host_fee_percentage: u8::from_le_bytes(*config_fees_host_fee_percentage),
                 },
+                deposit_limit: u64::from_le_bytes(*config_deposit_limit),
+                borrow_limit: u64::from_le_bytes(*config_borrow_limit),
+                fee_receiver: Pubkey::new_from_array(*config_fee_receiver),
             },
         })
     }
