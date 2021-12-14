@@ -12,6 +12,9 @@ use {
 };
 
 mod processor;
+mod state;
+mod math;
+mod error;
 
 entrypoint!(process_instruction);
 pub fn process_instruction(

@@ -1,4 +1,5 @@
 use solana_client::client_error::reqwest::blocking::Response;
+pub mod reserve;
 
 use {
     std::env,
@@ -28,6 +29,7 @@ enum FluidityInstruction {
     Unwrap (u64, String, u8),
     Payout (u64),
     InitSolendObligation (u64, u64, String, u8),
+    LogTVL,
 }
 
 fn test_smart_contract(client: &RpcClient) {
@@ -232,6 +234,8 @@ fn test_smart_contract(client: &RpcClient) {
                     ]
                 )
             ]
+        }
+        "logtvl" => {
         }
         _ => panic!("please provide a valid command (help, wrap, unwrap, createacc, printpdakey)")
     };

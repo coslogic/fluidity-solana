@@ -1,5 +1,9 @@
 // Fluidity smart contract state processor
 
+use crate::{
+    state::{Obligation, Reserve},
+};
+
 use {
     std::str::FromStr,
     borsh::{BorshDeserialize, BorshSerialize},
@@ -13,6 +17,7 @@ use {
         program_error::ProgramError,
         pubkey::Pubkey,
         system_instruction, system_program,
+        program_pack::{IsInitialized, Pack},
     },
     spl_token,
 };
@@ -27,7 +32,8 @@ enum FluidityInstruction {
     // payout two accounts
     Payout (u64),
     // initialise solend obligation account
-    InitSolendObligation(u64, u64, String, u8),
+    InitSolendObligation (u64, u64, String, u8),
+    LogTVL,
 }
 
 #[derive(BorshSerialize)]
@@ -63,7 +69,7 @@ enum LendingInstruction {
 
     WithdrawObligationCollateral,
 
-    BorrowObligationLiquidity,
+    BorrowObtaigationLiquidity,
 
     RepayObligationLiquidity,
 
@@ -485,6 +491,20 @@ fn init_solend_obligation(
     Ok(())
 }
 
+pub fn log_tvl(accounts: &[AccountInfo]) -> ProgramResult {
+    let accounts_iter = &mut accounts.iter();
+
+    let obligation_info = next_account_info(accounts_iter)?;
+    let reserve_info = next_account_info(accounts_iter)?;
+
+    let obligation = Obligation::unpack(&obligation_info.data.borrow())?;
+    let reserve = Reserve::unpack(&reserve_info.data.borrow())?;
+    msg!("{:?}", &obligation.deposits);
+    msg!("{:?}", reserve.collateral_exchange_rate()?);
+
+    Ok(())
+}
+
 pub fn process(_program_id: &Pubkey, accounts: &[AccountInfo], input: &[u8]) -> ProgramResult {
     let instruction = FluidityInstruction::try_from_slice(input)?;
     match instruction {
@@ -499,6 +519,9 @@ pub fn process(_program_id: &Pubkey, accounts: &[AccountInfo], input: &[u8]) -> 
         }
         FluidityInstruction::InitSolendObligation(obligation_lamports, obligation_size, seed, bump) => {
             return init_solend_obligation(&accounts, obligation_lamports, obligation_size, seed, bump);
+        }
+        FluidityInstruction::LogTVL => {
+            return log_tvl(&accounts);
         }
     };
 }
