@@ -494,13 +494,53 @@ fn init_solend_obligation(
 pub fn log_tvl(accounts: &[AccountInfo]) -> ProgramResult {
     let accounts_iter = &mut accounts.iter();
 
+    let solend_program = next_account_info(accounts_iter)?;
     let obligation_info = next_account_info(accounts_iter)?;
     let reserve_info = next_account_info(accounts_iter)?;
+    let pyth_price_info = next_account_info(accounts_iter)?;
+    let switchboard_feed_info = next_account_info(accounts_iter)?;
+    let clock_info = next_account_info(accounts_iter)?;
+
+    invoke(
+        &Instruction::new_with_borsh(
+            *solend_program.key,
+            &LendingInstruction::RefreshReserve,
+            vec![
+                AccountMeta::new(*reserve_info.key, false),
+                AccountMeta::new_readonly(*pyth_price_info.key, false),
+                AccountMeta::new_readonly(*switchboard_feed_info.key, false),
+                AccountMeta::new_readonly(*clock_info.key, false),
+            ],
+        ),
+        &[
+            reserve_info.clone(),
+            pyth_price_info.clone(),
+            switchboard_feed_info.clone(),
+            clock_info.clone(),
+            solend_program.clone(),
+        ],
+    )?;
+
+    invoke(
+        &Instruction::new_with_borsh(
+            *solend_program.key,
+            &LendingInstruction::RefreshObligation,
+            vec![
+                AccountMeta::new(*obligation_info.key, false),
+                AccountMeta::new_readonly(*clock_info.key, false),
+                AccountMeta::new(*reserve_info.key, false),
+            ],
+        ),
+        &[
+            obligation_info.clone(),
+            clock_info.clone(),
+            reserve_info.clone(),
+            solend_program.clone(),
+        ],
+    )?;
 
     let obligation = Obligation::unpack(&obligation_info.data.borrow())?;
-    msg!("{:?}", &obligation.deposits);
-    let reserve = Reserve::unpack(&reserve_info.data.borrow())?;
-    msg!("{:?}", reserve.collateral_exchange_rate()?);
+    msg!("{}", obligation.deposited_value);
 
     Ok(())
 }
