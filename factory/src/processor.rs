@@ -2,6 +2,7 @@
 
 use crate::{
     state::{Obligation, Reserve},
+    math::*,
 };
 
 use {
@@ -309,11 +310,17 @@ fn unwrap(accounts: &[AccountInfo], amount: u64, seed: String, bump: u8) -> Prog
         ],
     )?;
 
+    let reserve = Reserve::unpack(&withdraw_reserve_info.data.borrow())?;
+    let exchange_rate = Rate::from(reserve.collateral_exchange_rate()?);
+    let collateral_amount = exchange_rate.try_mul(amount)?.to_scaled_val() as u64;
+    msg!("exchange rate: {}", exchange_rate);
+    msg!("collateral amount: {}", collateral_amount);
+
     invoke_signed(
         &Instruction::new_with_borsh(
             *solend_program.key,
             &LendingInstruction::WithdrawObligationCollateralAndRedeemReserveCollateral {
-                collateral_amount: amount,
+                collateral_amount,
             },
             vec![
                 AccountMeta::new(*destination_collateral_info.key, false),

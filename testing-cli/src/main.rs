@@ -16,6 +16,7 @@ use {
         system_program,
         system_instruction,
     },
+    solana_transaction_status::UiTransaction,
     borsh::BorshSerialize,
     std::str::FromStr,
     spl_token,
@@ -235,15 +236,27 @@ fn test_smart_contract(client: &RpcClient) {
             ]
         }
         "logtvl" => {
-            let obligation = Pubkey::from_str(&env::args().nth(3).unwrap()).unwrap();
-            let reserve = Pubkey::from_str(&env::args().nth(4).unwrap()).unwrap();
+            let solend_program =
+                Pubkey::from_str(&env::args().nth(3).unwrap()).unwrap();
+            let obligation =
+                Pubkey::from_str(&env::args().nth(4).unwrap()).unwrap();
+            let reserve =
+                Pubkey::from_str(&env::args().nth(5).unwrap()).unwrap();
+            let pyth_account =
+                Pubkey::from_str(&env::args().nth(6).unwrap()).unwrap();
+            let switchboard_account =
+                Pubkey::from_str(&env::args().nth(7).unwrap()).unwrap();
             vec![
                 Instruction::new_with_borsh(
                     prog_id,
                     &FluidityInstruction::LogTVL,
                     vec![
-                        AccountMeta::new_readonly(obligation, false),
-                        AccountMeta::new_readonly(reserve, false),
+                        AccountMeta::new_readonly(solend_program, false),
+                        AccountMeta::new(obligation, false),
+                        AccountMeta::new(reserve, false),
+                        AccountMeta::new_readonly(pyth_account, false),
+                        AccountMeta::new_readonly(switchboard_account, false),
+                        AccountMeta::new_readonly(sysvar::clock::ID, false),
                     ]
                 )
             ]
@@ -254,25 +267,50 @@ fn test_smart_contract(client: &RpcClient) {
     // create and send txn to program
     let mut txn = Transaction::new_with_payer(&inst, Some(&payer.pubkey()));
     txn.sign(&[&payer], recent_blockhash);
-    if let Err(e) = client.send_transaction(&txn) {
-        if let solana_client::client_error::ClientErrorKind::RpcError(rpc_err) = e.kind {
-            match rpc_err {
-                RpcError::RpcResponseError{code: _, message, data} =>
-                    panic!("Failed to send txn (RPC Error): {}{}", message, match data {
-                        solana_client::rpc_request::RpcResponseErrorData::SendTransactionPreflightFailure(res) =>
-                            match res.logs {
-                                Some(logs) => format!("\nLogs: {:#?}", logs),
-                                _ => "".to_string(),
-                            }
-                        _ => "".to_string(),
-                    }),
-                RpcError::RpcRequestError(msg)|RpcError::ParseError(msg)|RpcError::ForUser(msg) =>
-                    panic!("Failed to send txn (RPC Error): {}", msg),
+    match client.send_and_confirm_transaction(&txn) {
+        Ok(sig) => {
+            if let Ok(t) = client.get_transaction(&sig, solana_transaction_status::UiTransactionEncoding::JsonParsed) {
+                if let Some(meta) = t.transaction.meta {
+                    if let Some(logs) = meta.log_messages {
+                        println!("Logs: {:#?}", logs);
+                    } else {
+                        println!("no logs");
+                    }
+                } else {
+                    println!("no meta");
+                }
+            } else {
+                println!("couldn't get transaction");
             }
-        } else {
-            panic!("Failed to send txn: {}", e)
         }
+        Err(e) => {
+            if let solana_client::client_error::ClientErrorKind::RpcError(rpc_err) = e.kind {
+                match rpc_err {
+                    RpcError::RpcResponseError{code: _, message, data} =>
+                        panic!("Failed to send txn (RPC Error): {}{}", message, match data {
+                            solana_client::rpc_request::RpcResponseErrorData::SendTransactionPreflightFailure(res) =>
+                                match res.logs {
+                                    Some(logs) => format!("\nLogs: {:#?}", logs),
+                                    _ => "".to_string(),
+                                }
+                            _ => "".to_string(),
+                        }),
+                    RpcError::RpcRequestError(msg)|RpcError::ParseError(msg)|RpcError::ForUser(msg) =>
+                        panic!("Failed to send txn (RPC Error): {}", msg),
+                }
+            } else {
+                panic!("Failed to send txn: {}", e)
+            }
+        }
+        _ => (),
     };
+    /*
+    if let Ok(res) = client.simulate_transaction(&txn) {
+        if let Some(logs) = res.value.logs {
+            println!("{:#?}", logs);
+        }
+    }
+    */
 }
 
 fn main() {
