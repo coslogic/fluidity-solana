@@ -329,7 +329,7 @@ fn unwrap(accounts: &[AccountInfo], amount: u64, seed: String, bump: u8) -> Prog
                 AccountMeta::new(*obligation_info.key, false),
                 AccountMeta::new(*lending_market_info.key, false),
                 AccountMeta::new_readonly(*lending_market_authority_info.key, false),
-                AccountMeta::new(*pda_token_account.key, false),
+                AccountMeta::new(*token_account.key, false),
                 AccountMeta::new(*reserve_collateral_mint_info.key, false),
                 AccountMeta::new(*reserve_liquidity_supply_info.key, false),
                 AccountMeta::new(*pda_account.key, true),
@@ -356,6 +356,7 @@ fn unwrap(accounts: &[AccountInfo], amount: u64, seed: String, bump: u8) -> Prog
         &[&[&seed.as_bytes(), &[bump]]],
     )?;
 
+    /*
     invoke_signed(
         &spl_token::instruction::transfer(
             &token_program.key,
@@ -373,7 +374,7 @@ fn unwrap(accounts: &[AccountInfo], amount: u64, seed: String, bump: u8) -> Prog
             token_program.clone(),
         ],
         &[&[&seed.as_bytes(), &[bump]]],
-    )?;
+    )?;*/
 
     Ok(())
 }

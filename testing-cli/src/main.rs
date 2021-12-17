@@ -267,6 +267,7 @@ fn test_smart_contract(client: &RpcClient) {
     // create and send txn to program
     let mut txn = Transaction::new_with_payer(&inst, Some(&payer.pubkey()));
     txn.sign(&[&payer], recent_blockhash);
+    /*
     match client.send_and_confirm_transaction(&txn) {
         Ok(sig) => {
             if let Ok(t) = client.get_transaction(&sig, solana_transaction_status::UiTransactionEncoding::JsonParsed) {
@@ -304,13 +305,12 @@ fn test_smart_contract(client: &RpcClient) {
         }
         _ => (),
     };
-    /*
+    */
     if let Ok(res) = client.simulate_transaction(&txn) {
         if let Some(logs) = res.value.logs {
             println!("{:#?}", logs);
         }
     }
-    */
 }
 
 fn main() {
