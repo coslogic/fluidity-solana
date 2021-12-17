@@ -201,6 +201,20 @@ fn wrap(accounts: &[AccountInfo], amount: u64, seed: String, bump: u8) -> Progra
         ],
     )?;
 
+    invoke(
+        &Instruction::new_with_borsh(
+            *solend_program.key,
+            &LendingInstruction::RefreshReserve,
+            vec![
+                AccountMeta::new(*reserve_info.key, false),
+                AccountMeta::new_readonly(*pyth_price_info.key, false),
+                AccountMeta::new_readonly(*switchboard_feed_info.key, false),
+                AccountMeta::new_readonly(*clock_info.key, false),
+            ],
+        ),
+        &[reserve_info.clone(), pyth_price_info.clone(), switchboard_feed_info.clone(), clock_info.clone(), solend_program.clone()]
+    )?;
+
     let reserve = Reserve::unpack(&reserve_info.data.borrow())?;
     let collateral_amount = reserve.collateral_exchange_rate()?.liquidity_to_collateral(amount)?;
 
