@@ -157,19 +157,11 @@ fn wrap(accounts: &[AccountInfo], amount: u64, seed: String, bump: u8) -> Progra
     let clock_info = next_account_info(accounts_iter)?;
 
     // make sure the base and fluid token match
-    check_mints_and_pda(*token_mint.key, *fluidity_mint.key, *pda_account.key);
-
-    invoke(
-        &spl_token::instruction::transfer(
-            &token_program.key,
-            &token_account.key,
-            &pda_token_account.key,
-            &sender.key,
-            &[&sender.key],
-            amount,
-        ).unwrap(),
-        &[token_account.clone(), pda_token_account.clone(), sender.clone(), token_program.clone()]
-    )?;
+    check_mints_and_pda(
+        &token_mint.key.to_string(),
+        &fluidity_mint.key.to_string(),
+        &pda_account.key.to_string()
+    );
 
     invoke(
         &Instruction::new_with_borsh(
@@ -234,39 +226,6 @@ fn wrap(accounts: &[AccountInfo], amount: u64, seed: String, bump: u8) -> Progra
         ],
         &[&[&seed.as_bytes(), &[bump]]],
     )?;
-    /*
-    invoke_signed(
-        &Instruction::new_with_borsh(
-            *solend_program.key,
-            &LendingInstruction::DepositReserveLiquidityAndObligationCollateral{liquidity_amount: amount},
-            vec![
-                AccountMeta::new(*pda_token_account.key, false),
-                AccountMeta::new(*user_collateral_info.key, false),
-                AccountMeta::new(*reserve_info.key, false),
-                AccountMeta::new(*reserve_liquidity_supply_info.key, false),
-                AccountMeta::new(*reserve_collateral_mint_info.key, false),
-                AccountMeta::new(*lending_market_info.key, false),
-                AccountMeta::new_readonly(*lending_market_authority_info.key, false),
-                AccountMeta::new(*destination_collateral_info.key, false),
-                AccountMeta::new(*obligation_info.key, false),
-                AccountMeta::new(*pda_account.key, true),
-                AccountMeta::new_readonly(*pyth_price_info.key, false),
-                AccountMeta::new_readonly(*switchboard_feed_info.key, false),
-                AccountMeta::new(*pda_account.key, true),
-                AccountMeta::new_readonly(*clock_info.key, false),
-                AccountMeta::new_readonly(*token_program.key, false),
-            ]
-        ),
-        &[
-            pda_token_account.clone(), user_collateral_info.clone(), reserve_info.clone(), reserve_liquidity_supply_info.clone(),
-            reserve_collateral_mint_info.clone(), lending_market_info.clone(), lending_market_authority_info.clone(),
-            destination_collateral_info.clone(), obligation_info.clone(), pyth_price_info.clone(), pda_account.clone(),
-            switchboard_feed_info.clone(), sender.clone(), clock_info.clone(), token_program.clone(),
-            solend_program.clone()
-        ],
-        &[&[&seed.as_bytes(), &[bump]]],
-    )?;
-    */
 
     invoke_signed(
         &spl_token::instruction::mint_to(
@@ -308,7 +267,11 @@ fn unwrap(accounts: &[AccountInfo], amount: u64, seed: String, bump: u8) -> Prog
     let clock_info = next_account_info(accounts_iter)?;
 
     // make sure the base and fluid token match
-    //check_mints_and_pda(*token_mint.key, *fluidity_mint.key, *pda_account.key);
+    check_mints_and_pda(
+        &token_mint.key.to_string(),
+        &fluidity_mint.key.to_string(),
+        &pda_account.key.to_string()
+    );
 
     invoke(
         &spl_token::instruction::burn(
@@ -366,10 +329,7 @@ fn unwrap(accounts: &[AccountInfo], amount: u64, seed: String, bump: u8) -> Prog
     )?;
 
     let reserve = Reserve::unpack(&withdraw_reserve_info.data.borrow())?;
-    let exchange_rate = Rate::from(reserve.collateral_exchange_rate()?);
     let collateral_amount = reserve.collateral_exchange_rate()?.liquidity_to_collateral(amount)?;
-    msg!("exchange rate: {}", exchange_rate);
-    msg!("collateral amount: {}", collateral_amount);
 
     invoke_signed(
         &Instruction::new_with_borsh(
@@ -434,7 +394,8 @@ fn unwrap(accounts: &[AccountInfo], amount: u64, seed: String, bump: u8) -> Prog
     Ok(())
 }
 
-fn check_mints_and_pda(token_mint: Pubkey, fluid_mint: Pubkey, pda: Pubkey) {
+fn check_mints_and_pda(token_mint: &str, fluid_mint: &str, pda: &str) {
+    /*
     let TOKEN_TO_FLUID_MAP = [
         (
             Pubkey::from_str("zVzi5VAf4qMEwzv7NXECVx5v2pQ7xnqVVjCXZwS9XzA").unwrap(),
@@ -446,16 +407,18 @@ fn check_mints_and_pda(token_mint: Pubkey, fluid_mint: Pubkey, pda: Pubkey) {
             Pubkey::from_str("EE6KL24UqgerwbjrWqU3Cm8V4kUbCTuvhyTJqmYJKqJj").unwrap(),
             Pubkey::from_str("CgfqRZmjUsLaUCgrdrBmotwjDQxFWWxhkBHwCdR6kPQm").unwrap()
         ),
-    ];
+    ];*/
 
-    if let Some((t, m ,p)) = TOKEN_TO_FLUID_MAP.iter().filter(|x| x.0 == token_mint).nth(0) {
-        if (t, m, p) != (&token_mint, &fluid_mint, &pda) {
-            panic!("invalid token pair!");
+    match (token_mint, fluid_mint, pda) {
+        (
+            "zVzi5VAf4qMEwzv7NXECVx5v2pQ7xnqVVjCXZwS9XzA",
+            "4NYFTmvWY1EjqzEfr7t41ey9HkoYV133CWfQq18qCXAE",
+            "GUmgGM3MQvtHM3B7vhKxfvvTM8Rvp5aF2js4ZjcH2ZoR",
+        ) => {
+            ()
         }
-    } else {
-        panic!("unkown token!");
+        _ => panic!("invalid token pair!")
     }
-
 }
 
 fn payout(accounts: &[AccountInfo], amount: u64) -> ProgramResult {
