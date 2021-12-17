@@ -47,7 +47,9 @@ enum LendingInstruction {
 
     RefreshReserve,
 
-    DepositReserveLiquidity,
+    DepositReserveLiquidity {
+        liquidity_amount: u64,
+    },
 
     RedeemReserveCollateral,
 
@@ -66,7 +68,9 @@ enum LendingInstruction {
 
     RefreshObligation,
 
-    DepositObligationCollateral,
+    DepositObligationCollateral {
+        collateral_amount: u64,
+    },
 
     WithdrawObligationCollateral,
 
@@ -181,6 +185,53 @@ fn wrap(accounts: &[AccountInfo], amount: u64, seed: String, bump: u8) -> Progra
         &[reserve_info.clone(), pyth_price_info.clone(), switchboard_feed_info.clone(), clock_info.clone(), solend_program.clone()]
     )?;
 
+    invoke(
+        &Instruction::new_with_borsh(
+            *solend_program.key,
+            &LendingInstruction::DepositReserveLiquidity{liquidity_amount: amount},
+            vec![
+                AccountMeta::new(*token_account.key, false),
+                AccountMeta::new(*user_collateral_info.key, false),
+                AccountMeta::new(*reserve_info.key, false),
+                AccountMeta::new(*reserve_liquidity_supply_info.key, false),
+                AccountMeta::new(*reserve_collateral_mint_info.key, false),
+                AccountMeta::new(*lending_market_info.key, false),
+                AccountMeta::new_readonly(*lending_market_authority_info.key, false),
+                AccountMeta::new(*sender.key, true),
+                AccountMeta::new_readonly(*clock_info.key, false),
+                AccountMeta::new_readonly(*token_program.key, false),
+            ],
+        ),
+        &[
+            token_account.clone(), user_collateral_info.clone(), reserve_info.clone(), reserve_liquidity_supply_info.clone(),
+            reserve_collateral_mint_info.clone(), lending_market_info.clone(), lending_market_authority_info.clone(),
+            sender.clone(), clock_info.clone(), token_program.clone(),
+        ],
+    )?;
+
+    invoke_signed(
+        &Instruction::new_with_borsh(
+            *solend_program.key,
+            &LendingInstruction::DepositObligationCollateral{collateral_amount: amount},
+            vec![
+                AccountMeta::new(*user_collateral_info.key, false),
+                AccountMeta::new(*destination_collateral_info.key, false),
+                AccountMeta::new(*reserve_info.key, false),
+                AccountMeta::new(*obligation_info.key, false),
+                AccountMeta::new(*lending_market_info.key, false),
+                AccountMeta::new(*pda_account.key, true),
+                AccountMeta::new(*pda_account.key, true),
+                AccountMeta::new_readonly(*clock_info.key, false),
+                AccountMeta::new_readonly(*token_program.key, false),
+            ]
+        ),
+        &[
+            user_collateral_info.clone(), destination_collateral_info.clone(), reserve_info.clone(), obligation_info.clone(),
+            lending_market_info.clone(), pda_account.clone(), clock_info.clone(), token_program.clone(),
+        ],
+        &[&[&seed.as_bytes(), &[bump]]],
+    )?;
+    /*
     invoke_signed(
         &Instruction::new_with_borsh(
             *solend_program.key,
@@ -212,6 +263,7 @@ fn wrap(accounts: &[AccountInfo], amount: u64, seed: String, bump: u8) -> Progra
         ],
         &[&[&seed.as_bytes(), &[bump]]],
     )?;
+    */
 
     invoke_signed(
         &spl_token::instruction::mint_to(
@@ -253,7 +305,7 @@ fn unwrap(accounts: &[AccountInfo], amount: u64, seed: String, bump: u8) -> Prog
     let clock_info = next_account_info(accounts_iter)?;
 
     // make sure the base and fluid token match
-    check_mints_and_pda(*token_mint.key, *fluidity_mint.key, *pda_account.key);
+    //check_mints_and_pda(*token_mint.key, *fluidity_mint.key, *pda_account.key);
 
     invoke(
         &spl_token::instruction::burn(
@@ -345,7 +397,7 @@ fn unwrap(accounts: &[AccountInfo], amount: u64, seed: String, bump: u8) -> Prog
             obligation_info.clone(),
             lending_market_info.clone(),
             lending_market_authority_info.clone(),
-            pda_token_account.clone(),
+            token_account.clone(),
             reserve_collateral_mint_info.clone(),
             reserve_liquidity_supply_info.clone(),
             pda_account.clone(),
