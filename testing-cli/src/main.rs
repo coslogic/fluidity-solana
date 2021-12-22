@@ -1,4 +1,7 @@
+use std::convert::TryFrom;
+
 use solana_client::client_error::reqwest::blocking::Response;
+use solana_sdk::commitment_config::CommitmentConfig;
 
 use {
     std::env,
@@ -17,19 +20,29 @@ use {
         system_instruction,
     },
     solana_transaction_status::UiTransaction,
-    borsh::BorshSerialize,
+    borsh::{BorshDeserialize, BorshSerialize},
     std::str::FromStr,
     spl_token,
     spl_associated_token_account,
 };
 
+// struct defining fludity data account
+#[derive(BorshDeserialize, BorshSerialize, Debug, PartialEq, Clone)]
+struct FluidityData {
+    deposited_liquidity: u64,
+    token_mint: Pubkey,
+    fluid_mint: Pubkey,
+    pda: Pubkey,
+}
+
 #[derive(BorshSerialize)]
 enum FluidityInstruction {
     Wrap (u64, String, u8),
     Unwrap (u64, String, u8),
-    Payout (u64),
+    Payout (u64, String, u8),
     InitSolendObligation (u64, u64, String, u8),
     LogTVL,
+    InitData(String, u64, u64, u8),
 }
 
 fn test_smart_contract(client: &RpcClient) {
@@ -52,6 +65,14 @@ fn test_smart_contract(client: &RpcClient) {
     let mint_account_seed = format!("FLU:{}_OBLIGATION", token_name);
     let (pda_pubkey, bump_seed) = Pubkey::find_program_address(&[mint_account_seed.as_bytes()], &prog_id);
 
+    // derive address of data account
+    let data_account_seed = format!("FLU:{}_DATA", token_name);
+    let data_pubkey = Pubkey::create_with_seed(&pda_pubkey, &data_account_seed, &prog_id).unwrap();
+
+    if let Ok(data_account) = client.get_account_data(&data_pubkey) {
+        println!("{:?}", FluidityData::try_from_slice(&data_account[..]));
+    }
+
     match command.as_str() {
         "help" => {
             println!("[wrap/unwrap] base_token_id fluidity_token_id base_token_account fluidity_token_account");
@@ -70,13 +91,13 @@ fn test_smart_contract(client: &RpcClient) {
         "wrap" => {
             let amount =
                 env::args().nth(3).unwrap().parse::<u64>().unwrap();
-            let base_token_id =
+            let fluidity_data_account =
                 Pubkey::from_str(&env::args().nth(4).unwrap()).unwrap();
-            let fluidity_token_id =
+            let base_token_id =
                 Pubkey::from_str(&env::args().nth(5).unwrap()).unwrap();
-            let base_token_account =
+            let fluidity_token_id =
                 Pubkey::from_str(&env::args().nth(6).unwrap()).unwrap();
-            let pda_token_account =
+            let base_token_account =
                 Pubkey::from_str(&env::args().nth(7).unwrap()).unwrap();
             let fluidity_token_account =
                 Pubkey::from_str(&env::args().nth(8).unwrap()).unwrap();
@@ -105,15 +126,15 @@ fn test_smart_contract(client: &RpcClient) {
             vec![
                 Instruction::new_with_borsh(
                     prog_id,
-                    &FluidityInstruction::Wrap(amount, mint_account_seed, bump_seed),
+                    &FluidityInstruction::Wrap(amount, token_name, bump_seed),
                     vec![
+                        AccountMeta::new(fluidity_data_account, false),
                         AccountMeta::new_readonly(spl_token::ID, false),
                         AccountMeta::new(base_token_id, false),
                         AccountMeta::new(fluidity_token_id, false),
                         AccountMeta::new(pda_pubkey, false),
                         AccountMeta::new(payer.pubkey(), true),
                         AccountMeta::new(base_token_account, false),
-                        AccountMeta::new(pda_token_account, false),
                         AccountMeta::new(fluidity_token_account, false),
                         AccountMeta::new_readonly(solend_program, false),
                         AccountMeta::new(collateral_account, false),
@@ -134,50 +155,50 @@ fn test_smart_contract(client: &RpcClient) {
         "unwrap" => {
             let amount =
                 env::args().nth(3).unwrap().parse::<u64>().unwrap();
-            let base_token_id =
+            let fluidity_data_account =
                 Pubkey::from_str(&env::args().nth(4).unwrap()).unwrap();
-            let fluidity_token_id =
+            let base_token_id =
                 Pubkey::from_str(&env::args().nth(5).unwrap()).unwrap();
-            let base_token_account =
+            let fluidity_token_id =
                 Pubkey::from_str(&env::args().nth(6).unwrap()).unwrap();
-            let fluidity_token_account =
+            let base_token_account =
                 Pubkey::from_str(&env::args().nth(7).unwrap()).unwrap();
-            let solend_program =
+            let fluidity_token_account =
                 Pubkey::from_str(&env::args().nth(8).unwrap()).unwrap();
-            let destination_collateral =
+            let solend_program =
                 Pubkey::from_str(&env::args().nth(9).unwrap()).unwrap();
-            let user_collateral =
+            let destination_collateral =
                 Pubkey::from_str(&env::args().nth(10).unwrap()).unwrap();
-            let withdraw_reserve =
+            let user_collateral =
                 Pubkey::from_str(&env::args().nth(11).unwrap()).unwrap();
-            let obligation =
+            let withdraw_reserve =
                 Pubkey::from_str(&env::args().nth(12).unwrap()).unwrap();
-            let lending_market =
+            let obligation =
                 Pubkey::from_str(&env::args().nth(13).unwrap()).unwrap();
-            let lending_market_authority =
+            let lending_market =
                 Pubkey::from_str(&env::args().nth(14).unwrap()).unwrap();
-            let reserve_collateral_mint =
+            let lending_market_authority =
                 Pubkey::from_str(&env::args().nth(15).unwrap()).unwrap();
-            let reserve_liquidity_supply =
+            let reserve_collateral_mint =
                 Pubkey::from_str(&env::args().nth(16).unwrap()).unwrap();
+            let reserve_liquidity_supply =
+                Pubkey::from_str(&env::args().nth(17).unwrap()).unwrap();
             let withdraw_pyth_price =
-                Pubkey::from_str(&env::args().nth(17).unwrap()).unwrap(); 
-            let withdraw_switchboard_feed =
                 Pubkey::from_str(&env::args().nth(18).unwrap()).unwrap(); 
-            let pda_token_pubkey =
-                spl_associated_token_account::get_associated_token_address(&pda_pubkey, &base_token_id);
+            let withdraw_switchboard_feed =
+                Pubkey::from_str(&env::args().nth(19).unwrap()).unwrap(); 
 
             vec![Instruction::new_with_borsh(
                 prog_id,
-                &FluidityInstruction::Unwrap(amount, mint_account_seed, bump_seed),
+                &FluidityInstruction::Unwrap(amount, token_name, bump_seed),
                 vec![
+                    AccountMeta::new(fluidity_data_account, false),
                     AccountMeta::new_readonly(spl_token::ID, false),
                     AccountMeta::new(base_token_id, false),
                     AccountMeta::new(fluidity_token_id, false),
                     AccountMeta::new(pda_pubkey, false),
                     AccountMeta::new(payer.pubkey(), true),
                     AccountMeta::new(base_token_account, false),
-                    AccountMeta::new(pda_token_pubkey, false),
                     AccountMeta::new(fluidity_token_account, false),
                     AccountMeta::new_readonly(solend_program, false),
                     AccountMeta::new(destination_collateral, false),
@@ -220,7 +241,7 @@ fn test_smart_contract(client: &RpcClient) {
                 ),
                 Instruction::new_with_borsh(
                     prog_id,
-                    &FluidityInstruction::InitSolendObligation(client.get_minimum_balance_for_rent_exemption(1300).unwrap(), 1300, mint_account_seed, bump_seed),
+                    &FluidityInstruction::InitSolendObligation(client.get_minimum_balance_for_rent_exemption(1300).unwrap(), 1300, token_name, bump_seed),
                     vec![
                         AccountMeta::new(payer.pubkey(), true),
                         AccountMeta::new_readonly(solend_program, false),
@@ -261,13 +282,35 @@ fn test_smart_contract(client: &RpcClient) {
                 )
             ]
         }
+        "initdata" => {
+            let token_mint =
+                Pubkey::from_str(&env::args().nth(3).unwrap()).unwrap();
+            let fluid_mint =
+                Pubkey::from_str(&env::args().nth(4).unwrap()).unwrap();
+            let space = std::mem::size_of::<FluidityData>() as u64;
+            let lamports = client.get_minimum_balance_for_rent_exemption(std::mem::size_of::<FluidityData>()).unwrap();
+            vec![
+                Instruction::new_with_borsh(
+                    prog_id,
+                    &FluidityInstruction::InitData(token_name, lamports, space, bump_seed),
+                    vec![
+                        AccountMeta::new_readonly(system_program::ID, false),
+                        AccountMeta::new(payer.pubkey(), false),
+                        AccountMeta::new(prog_id, false),
+                        AccountMeta::new(data_pubkey, false),
+                        AccountMeta::new_readonly(token_mint, false),
+                        AccountMeta::new_readonly(fluid_mint, false),
+                        AccountMeta::new_readonly(pda_pubkey, false),
+                    ]
+                )
+            ]
+        }
         _ => panic!("please provide a valid command (help, wrap, unwrap, createacc, printpdakey)")
     };
 
     // create and send txn to program
     let mut txn = Transaction::new_with_payer(&inst, Some(&payer.pubkey()));
     txn.sign(&[&payer], recent_blockhash);
-    /*
     match client.send_and_confirm_transaction(&txn) {
         Ok(sig) => {
             if let Ok(t) = client.get_transaction(&sig, solana_transaction_status::UiTransactionEncoding::JsonParsed) {
@@ -305,12 +348,16 @@ fn test_smart_contract(client: &RpcClient) {
         }
         _ => (),
     };
-    */
+    /*
     if let Ok(res) = client.simulate_transaction(&txn) {
         if let Some(logs) = res.value.logs {
             println!("{:#?}", logs);
         }
+        if let Some(accounts) = res.value.accounts {
+            println!("{:#?}", accounts);
+        }
     }
+    */
 }
 
 fn main() {

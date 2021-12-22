@@ -11,6 +11,7 @@ use {
     },
 };
 
+mod instruction;
 mod processor;
 mod state;
 mod math;
