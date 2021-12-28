@@ -7,7 +7,7 @@ use crate::{
 };
 
 use {
-    std::str::FromStr,
+    std::{str::FromStr, convert::TryFrom},
     borsh::{BorshDeserialize, BorshSerialize},
     solana_program::{
         account_info::{next_account_info, AccountInfo},
@@ -487,7 +487,9 @@ pub fn log_tvl(accounts: &[AccountInfo]) -> ProgramResult {
     let mut data = data_account.try_borrow_mut_data()?;
 
     // serialize value into data account
-    obligation.deposited_value.try_floor_u64()?.serialize(&mut &mut data[..])?;
+    msg!("{:?}", obligation.deposits);
+    //msg!("scaled {}", u64::try_from(obligation.deposited_value.to_scaled_val()?).unwrap());
+    //u64::try_from(obligation.deposited_value.to_scaled_val()?).unwrap().serialize(&mut &mut data[..])?;
 
     Ok(())
 }

@@ -1,11 +1,8 @@
-use std::convert::TryFrom;
-
-use solana_client::client_error::reqwest::blocking::Response;
-use solana_sdk::commitment_config::CommitmentConfig;
-
 use {
     std::env,
+    solana_account_decoder::{UiAccountData},
     solana_client::{
+        rpc_config::{RpcSimulateTransactionAccountsConfig, RpcSimulateTransactionConfig},
         rpc_client::RpcClient,
         rpc_request::RpcError,
     },
@@ -69,8 +66,30 @@ fn test_smart_contract(client: &RpcClient) {
     let data_account_seed = format!("FLU:{}_DATA", token_name);
     let data_pubkey = Pubkey::create_with_seed(&pda_pubkey, &data_account_seed, &prog_id).unwrap();
 
+    let tvl_data_seed = format!("FLU:{}_TVL", token_name);
+    let tvl_data_pubkey = Pubkey::create_with_seed(&payer.pubkey(), &tvl_data_seed, &prog_id).unwrap();
+    if let Ok(data_account) = client.get_account_data(&tvl_data_pubkey) {
+        println!("TVL: {}", u64::try_from_slice(&data_account[..]).unwrap());
+    } else {
+        let inst = vec![
+            system_instruction::create_account_with_seed(
+                &payer.pubkey(),
+                &tvl_data_pubkey,
+                &payer.pubkey(),
+                &tvl_data_seed,
+                client.get_minimum_balance_for_rent_exemption(std::mem::size_of::<u64>()).unwrap(),
+                std::mem::size_of::<u64>() as u64,
+                &prog_id,
+            ),
+        ];
+        let mut txn = Transaction::new_with_payer(&inst, Some(&payer.pubkey()));
+        txn.sign(&[&payer], recent_blockhash);
+        client.send_and_confirm_transaction(&txn).unwrap();
+
+    }
+
     if let Ok(data_account) = client.get_account_data(&data_pubkey) {
-        println!("{:?}", FluidityData::try_from_slice(&data_account[..]));
+        println!("{:?}", FluidityData::try_from_slice(&data_account[..]).unwrap());
     }
 
     match command.as_str() {
@@ -272,6 +291,7 @@ fn test_smart_contract(client: &RpcClient) {
                     prog_id,
                     &FluidityInstruction::LogTVL,
                     vec![
+                        AccountMeta::new(tvl_data_pubkey, false),
                         AccountMeta::new_readonly(solend_program, false),
                         AccountMeta::new(obligation, false),
                         AccountMeta::new(reserve, false),
@@ -311,6 +331,7 @@ fn test_smart_contract(client: &RpcClient) {
     // create and send txn to program
     let mut txn = Transaction::new_with_payer(&inst, Some(&payer.pubkey()));
     txn.sign(&[&payer], recent_blockhash);
+    /*
     match client.send_and_confirm_transaction(&txn) {
         Ok(sig) => {
             if let Ok(t) = client.get_transaction(&sig, solana_transaction_status::UiTransactionEncoding::JsonParsed) {
@@ -348,16 +369,49 @@ fn test_smart_contract(client: &RpcClient) {
         }
         _ => (),
     };
-    /*
-    if let Ok(res) = client.simulate_transaction(&txn) {
-        if let Some(logs) = res.value.logs {
-            println!("{:#?}", logs);
+    */
+    match command.as_str() {
+        "logtvl" => {
+            if let Ok(res) = client.simulate_transaction_with_config(
+                &txn,
+                RpcSimulateTransactionConfig {
+                    sig_verify: false,
+                    replace_recent_blockhash: false,
+                    commitment: None,
+                    encoding: None,
+                    accounts: Some(RpcSimulateTransactionAccountsConfig{
+                        encoding: None,
+                        addresses: vec![tvl_data_pubkey.to_string()],
+                    })
+                }) {
+                if let Some(logs) = res.value.logs {
+                    println!("{:#?}", logs);
+                }
+                if let Some(accounts) = res.value.accounts {
+                    let data = &accounts[0].as_ref().unwrap().data;
+                    println!("TVL: {}", u64::try_from_slice(
+                        &match data {
+                            UiAccountData::Binary(s, _) => {
+                                base64::decode(&s).unwrap()
+                            }
+                            _ => {
+                                vec!(0_u8)
+                            }
+                        }
+                    ).unwrap());
+                }
+            }
+                                                                     
         }
-        if let Some(accounts) = res.value.accounts {
-            println!("{:#?}", accounts);
+        _ => if let Ok(res) = client.simulate_transaction(&txn) {
+            if let Some(logs) = res.value.logs {
+                println!("{:#?}", logs);
+            }
+            if let Some(accounts) = res.value.accounts {
+                println!("{:#?}", accounts);
+            }
         }
     }
-    */
 }
 
 fn main() {

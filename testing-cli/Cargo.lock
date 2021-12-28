@@ -891,9 +891,11 @@ dependencies = [
 name = "fluidity-testing-cli"
 version = "0.1.0"
 dependencies = [
+ "base64 0.13.0",
  "borsh",
  "serde",
  "serde_json",
+ "solana-account-decoder",
  "solana-client",
  "solana-sdk",
  "solana-transaction-status",
