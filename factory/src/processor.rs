@@ -487,9 +487,9 @@ pub fn log_tvl(accounts: &[AccountInfo]) -> ProgramResult {
     let mut data = data_account.try_borrow_mut_data()?;
 
     // serialize value into data account
-    msg!("{:?}", obligation.deposits);
-    //msg!("scaled {}", u64::try_from(obligation.deposited_value.to_scaled_val()?).unwrap());
-    //u64::try_from(obligation.deposited_value.to_scaled_val()?).unwrap().serialize(&mut &mut data[..])?;
+    //msg!("{:?}", obligation.deposits);
+    //msg!("scaled {}", u64::try_from(obligation.deposited_value.to_scaled_val()?/10u128.pow(12)).unwrap());
+    u64::try_from(obligation.deposited_value.to_scaled_val()?/10u128.pow(12)).unwrap().serialize(&mut &mut data[..])?;
 
     Ok(())
 }
