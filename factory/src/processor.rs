@@ -44,7 +44,7 @@ fn wrap(accounts: &[AccountInfo], amount: u64, seed: String, bump: u8) -> Progra
     let token_account = next_account_info(accounts_iter)?;
     let fluidity_account = next_account_info(accounts_iter)?;
     let solend_program = next_account_info(accounts_iter)?;
-    let user_collateral_info = next_account_info(accounts_iter)?;
+    let collateral_info = next_account_info(accounts_iter)?;
     let reserve_info = next_account_info(accounts_iter)?;
     let reserve_liquidity_supply_info = next_account_info(accounts_iter)?;
     let reserve_collateral_mint_info = next_account_info(accounts_iter)?;
@@ -98,7 +98,7 @@ fn wrap(accounts: &[AccountInfo], amount: u64, seed: String, bump: u8) -> Progra
             &LendingInstruction::DepositReserveLiquidity{liquidity_amount: amount},
             vec![
                 AccountMeta::new(*token_account.key, false),
-                AccountMeta::new(*user_collateral_info.key, false),
+                AccountMeta::new(*collateral_info.key, false),
                 AccountMeta::new(*reserve_info.key, false),
                 AccountMeta::new(*reserve_liquidity_supply_info.key, false),
                 AccountMeta::new(*reserve_collateral_mint_info.key, false),
@@ -110,7 +110,7 @@ fn wrap(accounts: &[AccountInfo], amount: u64, seed: String, bump: u8) -> Progra
             ],
         ),
         &[
-            token_account.clone(), user_collateral_info.clone(), reserve_info.clone(),
+            token_account.clone(), collateral_info.clone(), reserve_info.clone(),
             reserve_liquidity_supply_info.clone(), reserve_collateral_mint_info.clone(),
             lending_market_info.clone(), lending_market_authority_info.clone(),
             sender.clone(), clock_info.clone(), token_program.clone(),
@@ -145,7 +145,7 @@ fn wrap(accounts: &[AccountInfo], amount: u64, seed: String, bump: u8) -> Progra
             *solend_program.key,
             &LendingInstruction::DepositObligationCollateral{collateral_amount},
             vec![
-                AccountMeta::new(*user_collateral_info.key, false),
+                AccountMeta::new(*collateral_info.key, false),
                 AccountMeta::new(*destination_collateral_info.key, false),
                 AccountMeta::new(*reserve_info.key, false),
                 AccountMeta::new(*obligation_info.key, false),
@@ -157,7 +157,7 @@ fn wrap(accounts: &[AccountInfo], amount: u64, seed: String, bump: u8) -> Progra
             ]
         ),
         &[
-            user_collateral_info.clone(), destination_collateral_info.clone(), reserve_info.clone(), obligation_info.clone(),
+            collateral_info.clone(), destination_collateral_info.clone(), reserve_info.clone(), obligation_info.clone(),
             lending_market_info.clone(), pda_account.clone(), clock_info.clone(), token_program.clone(),
         ],
         &[&[&pda_seed.as_bytes(), &[bump]]],
