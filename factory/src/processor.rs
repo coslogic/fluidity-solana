@@ -26,7 +26,6 @@ use {
 // struct defining fludity data account
 #[derive(BorshDeserialize, BorshSerialize, Debug, PartialEq, Clone)]
 pub struct FluidityData {
-    deposited_liquidity: u64,
     token_mint: Pubkey,
     fluid_mint: Pubkey,
     pda: Pubkey,
@@ -503,7 +502,7 @@ fn init_data(
 ) -> ProgramResult {
     let accounts_iter = &mut accounts.iter();
 
-    let system_account = next_account_info(accounts_iter)?;
+    let system_program = next_account_info(accounts_iter)?;
     let payer = next_account_info(accounts_iter)?;
     let program = next_account_info(accounts_iter)?;
     let data_account = next_account_info(accounts_iter)?;
@@ -524,13 +523,12 @@ fn init_data(
             space,
             program.key,
         ),
-        &[payer.clone(), data_account.clone(), pda.clone(), system_account.clone()],
+        &[payer.clone(), data_account.clone(), pda.clone(), system_program.clone()],
         &[&[&pda_seed.as_bytes(), &[bump]]],
     )?;
 
     let mut data = data_account.try_borrow_mut_data()?;
     FluidityData{
-        deposited_liquidity: 0,
         token_mint: *token_mint.key,
         fluid_mint: *fluid_mint.key,
         pda: *pda.key,

@@ -26,7 +26,6 @@ use {
 // struct defining fludity data account
 #[derive(BorshDeserialize, BorshSerialize, Debug, PartialEq, Clone)]
 struct FluidityData {
-    deposited_liquidity: u64,
     token_mint: Pubkey,
     fluid_mint: Pubkey,
     pda: Pubkey,

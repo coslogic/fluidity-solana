@@ -15,7 +15,7 @@ Wrap an amount of one token into the equivalent amount of its fluid analog. Requ
 | `token_program`                 | The spl-token program.                                                            |
 | `token_mint`                    | The mint of the token being wrapped.                                              |
 | `fluidity_mint`                 | The mint of the fluid token.                                                      |
-| `pda_account`                   | The obligation account for the target token derived from this program.            |
+| `pda_account`                   | The obligation authority account for the target token, derived from this program.            |
 | `sender`                        | The transaction sender.                                                           |
 | `token_account`                 | The sender's token account for the token being wrapped.                           |
 | `fluidity_account`              | The sender's token account for the fluid token.                                   |
@@ -44,7 +44,7 @@ Unwrap an amount of a fluid token and receive the equivalent amount of its base 
 | `token_program`                 | The spl-token program.                                                            |
 | `token_mint`                    | The mint of the token being unwrapped.                                            |
 | `fluidity_mint`                 | The mint of the fluid token.                                                      |
-| `pda_account`                   | The obligation account for the target token derived from this program.            |
+| `pda_account`                   | The obligation account authority for the target token, derived from this program.            |
 | `sender`                        | The transaction sender.                                                           |
 | `token_account`                 | The sender's token account for the token being unwrapped.                         |
 | `fluidity_account`              | The sender's token account for the fluid token.                                   |
@@ -70,7 +70,7 @@ Payout two accounts by minting an amount of the token into both token accounts. 
 | Name               | Description                                                            |
 | `token_program`    | The spl-token program.                                                 |
 | `fluidity_mint`    | The mint of the fluid token.                                           |
-| `pda_account`      | The obligation account for the target token derived from this program. |
+| `pda_account`      | The obligation authority account for the target token, derived from this program. |
 | `payout_account_a` | One of the fluidity token accounts to mint to.                         |
 | `payout_account_b` | One of the fluidity token accounts to mint to.                         |
 | `payer`            | The sender of the transaction. Must match authorised authority.        |
@@ -90,3 +90,33 @@ Initialise a solend obligation owned by this program's derived account for the s
 | `clock_info`            | The Solana clock sysvar.                                   |
 | `rent_info`             | The Solana rent sysvar.                                    |
 | `token_program`         | The spl-token program.                                     |
+
+## LogTVL
+
+Log the current value of assets held by the factory into a data account.
+
+### Accounts
+
+| Name                    | Description                                                         |
+| `data_account`          | The account to log the tvl into. Must be writeable by this program. |
+| `solend_program`        | The solend lending program.                                         |
+| `obligation_info`       | The PDA account's obligation account.                               |
+| `reserve_info`          | The associated solend reserve.                                      |
+| `pyth_price_feed_info`  | The associated pyth price feed.                                     |
+| `switchboard_feed_info` | The associated switchboard feed.                                    |
+| `clock_info`            | The Solana clock sysvar.                                            |
+
+## InitData(token\_name, lamports, space, bump\_seed)
+
+Initialise a data account that holds authorised pairs. Requires the name of the token to be provided in upper case, as well as the bump seed of the program's derived obligation authority account for that token.
+
+### Accounts
+
+| Name             | Description                                                                                 |
+| `system_program` | The Solana system program.                                                                  |
+| `payer`          | The sender of the transaction.                                                              |
+| `program`        | This program.                                                                               |
+| `data_account`   | The data account being initialised. Must be derived from the pda and owned by this program. |
+| `token_mint`     | The base token of the authorised pair.                                                      |
+| `fluid_mint`     | The fluid token of the authorised pair.                                                     |
+| `pda`            | The obligation authority account for the target token, derived from this program.           |
