@@ -67,13 +67,14 @@ Payout two accounts by minting an amount of the token into both token accounts. 
 
 ### Accounts
 
-| Name               | Description                                                            |
-| `token_program`    | The spl-token program.                                                 |
-| `fluidity_mint`    | The mint of the fluid token.                                           |
+| Name               | Description                                                                       |
+|--------------------|-----------------------------------------------------------------------------------|
+| `token_program`    | The spl-token program.                                                            |
+| `fluidity_mint`    | The mint of the fluid token.                                                      |
 | `pda_account`      | The obligation authority account for the target token, derived from this program. |
-| `payout_account_a` | One of the fluidity token accounts to mint to.                         |
-| `payout_account_b` | One of the fluidity token accounts to mint to.                         |
-| `payer`            | The sender of the transaction. Must match authorised authority.        |
+| `payout_account_a` | One of the fluidity token accounts to mint to.                                    |
+| `payout_account_b` | One of the fluidity token accounts to mint to.                                    |
+| `payer`            | The sender of the transaction. Must match authorised authority.                   |
 
 ## InitSolendObligation (obligation\_lamports, obigation\_size, token\_name, bump\_seed)
 
@@ -82,6 +83,7 @@ Initialise a solend obligation owned by this program's derived account for the s
 ### Accounts
 
 | Name                    | Description                                                |
+|-------------------------|------------------------------------------------------------|
 | `payer`                 | The sender of the transaction.                             |
 | `solend_program`        | The solend lending program.                                |
 | `system_program`        | The Solana system program.                                 |
@@ -98,6 +100,7 @@ Log the current value of assets held by the factory into a data account.
 ### Accounts
 
 | Name                    | Description                                                         |
+|-------------------------|---------------------------------------------------------------------|
 | `data_account`          | The account to log the tvl into. Must be writeable by this program. |
 | `solend_program`        | The solend lending program.                                         |
 | `obligation_info`       | The PDA account's obligation account.                               |
@@ -113,6 +116,7 @@ Initialise a data account that holds authorised pairs. Requires the name of the 
 ### Accounts
 
 | Name             | Description                                                                                 |
+|------------------|---------------------------------------------------------------------------------------------|
 | `system_program` | The Solana system program.                                                                  |
 | `payer`          | The sender of the transaction.                                                              |
 | `program`        | This program.                                                                               |
