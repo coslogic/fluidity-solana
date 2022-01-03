@@ -192,16 +192,16 @@ fn unwrap(accounts: &[AccountInfo], amount: u64, seed: String, bump: u8) -> Prog
     let token_account = next_account_info(accounts_iter)?;
     let fluidity_account = next_account_info(accounts_iter)?;
     let solend_program = next_account_info(accounts_iter)?;
-    let destination_collateral_info = next_account_info(accounts_iter)?;
-    let user_collateral_info = next_account_info(accounts_iter)?;
-    let withdraw_reserve_info = next_account_info(accounts_iter)?;
-    let obligation_info = next_account_info(accounts_iter)?;
+    let collateral_info = next_account_info(accounts_iter)?;
+    let reserve_info = next_account_info(accounts_iter)?;
+    let reserve_liquidity_supply_info = next_account_info(accounts_iter)?;
+    let reserve_collateral_mint_info = next_account_info(accounts_iter)?;
     let lending_market_info = next_account_info(accounts_iter)?;
     let lending_market_authority_info = next_account_info(accounts_iter)?;
-    let reserve_collateral_mint_info = next_account_info(accounts_iter)?;
-    let reserve_liquidity_supply_info = next_account_info(accounts_iter)?;
-    let withdraw_pyth_price_info = next_account_info(accounts_iter)?;
-    let withdraw_switchboard_feed_info = next_account_info(accounts_iter)?;
+    let deposited_collateral_info = next_account_info(accounts_iter)?;
+    let obligation_info = next_account_info(accounts_iter)?;
+    let pyth_price_info = next_account_info(accounts_iter)?;
+    let switchboard_feed_info = next_account_info(accounts_iter)?;
     let clock_info = next_account_info(accounts_iter)?;
 
     // create seed strings from provided token
@@ -244,16 +244,16 @@ fn unwrap(accounts: &[AccountInfo], amount: u64, seed: String, bump: u8) -> Prog
             *solend_program.key,
             &LendingInstruction::RefreshReserve,
             vec![
-                AccountMeta::new(*withdraw_reserve_info.key, false),
-                AccountMeta::new_readonly(*withdraw_pyth_price_info.key, false),
-                AccountMeta::new_readonly(*withdraw_switchboard_feed_info.key, false),
+                AccountMeta::new(*reserve_info.key, false),
+                AccountMeta::new_readonly(*pyth_price_info.key, false),
+                AccountMeta::new_readonly(*switchboard_feed_info.key, false),
                 AccountMeta::new_readonly(*clock_info.key, false),
             ],
         ),
         &[
-            withdraw_reserve_info.clone(),
-            withdraw_pyth_price_info.clone(),
-            withdraw_switchboard_feed_info.clone(),
+            reserve_info.clone(),
+            pyth_price_info.clone(),
+            switchboard_feed_info.clone(),
             clock_info.clone(),
             solend_program.clone(),
         ],
@@ -267,19 +267,19 @@ fn unwrap(accounts: &[AccountInfo], amount: u64, seed: String, bump: u8) -> Prog
             vec![
                 AccountMeta::new(*obligation_info.key, false),
                 AccountMeta::new_readonly(*clock_info.key, false),
-                AccountMeta::new(*withdraw_reserve_info.key, false),
+                AccountMeta::new(*reserve_info.key, false),
             ],
         ),
         &[
             obligation_info.clone(),
             clock_info.clone(),
-            withdraw_reserve_info.clone(),
+            reserve_info.clone(),
             solend_program.clone(),
         ],
     )?;
 
     // calculate collateral amount from refreshed reserve
-    let reserve = Reserve::unpack(&withdraw_reserve_info.data.borrow())?;
+    let reserve = Reserve::unpack(&reserve_info.data.borrow())?;
     let collateral_amount = reserve.collateral_exchange_rate()?.liquidity_to_collateral(amount)?;
 
     // withdraw from solend to the user's token account
@@ -290,9 +290,9 @@ fn unwrap(accounts: &[AccountInfo], amount: u64, seed: String, bump: u8) -> Prog
                 collateral_amount,
             },
             vec![
-                AccountMeta::new(*destination_collateral_info.key, false),
-                AccountMeta::new(*user_collateral_info.key, false),
-                AccountMeta::new(*withdraw_reserve_info.key, false),
+                AccountMeta::new(*deposited_collateral_info.key, false),
+                AccountMeta::new(*collateral_info.key, false),
+                AccountMeta::new(*reserve_info.key, false),
                 AccountMeta::new(*obligation_info.key, false),
                 AccountMeta::new(*lending_market_info.key, false),
                 AccountMeta::new_readonly(*lending_market_authority_info.key, false),
@@ -306,9 +306,9 @@ fn unwrap(accounts: &[AccountInfo], amount: u64, seed: String, bump: u8) -> Prog
             ],
         ),
         &[
-            destination_collateral_info.clone(),
-            user_collateral_info.clone(),
-            withdraw_reserve_info.clone(),
+            deposited_collateral_info.clone(),
+            collateral_info.clone(),
+            reserve_info.clone(),
             obligation_info.clone(),
             lending_market_info.clone(),
             lending_market_authority_info.clone(),
