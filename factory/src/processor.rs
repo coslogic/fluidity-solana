@@ -383,15 +383,17 @@ fn init_solend_obligation(
 ) -> ProgramResult {
     let accounts_iter = &mut accounts.iter();
     let payer = next_account_info(accounts_iter)?;
-    let solend_program_info = next_account_info(accounts_iter)?;
-    let system_program_info = next_account_info(accounts_iter)?;
+    let solend_program = next_account_info(accounts_iter)?;
+    let system_program = next_account_info(accounts_iter)?;
     // init obligation infos
     let obligation_info = next_account_info(accounts_iter)?;
     let lending_market_info = next_account_info(accounts_iter)?;
     let obligation_owner_info = next_account_info(accounts_iter)?;
     let clock_info = next_account_info(accounts_iter)?;
     let rent_info = next_account_info(accounts_iter)?;
-    let token_program_id = next_account_info(accounts_iter)?;
+    let token_program = next_account_info(accounts_iter)?;
+
+    let pda_seed =  format!("FLU:{}_OBLIGATION", seed);
 
     invoke_signed(
         &system_instruction::create_account_with_seed(
@@ -401,18 +403,18 @@ fn init_solend_obligation(
             &lending_market_info.key.to_string()[0..32],
             obligation_lamports,
             obligation_size,
-            &solend_program_info.key,
+            &solend_program.key,
         ),
         &[
             payer.clone(), obligation_info.clone(), obligation_owner_info.clone(),
-            lending_market_info.clone(), solend_program_info.clone(), system_program_info.clone()
+            lending_market_info.clone(), solend_program.clone(), system_program.clone()
         ],
-        &[&[&seed.as_bytes(), &[bump]]],
+        &[&[&pda_seed.as_bytes(), &[bump]]],
     )?;
 
     invoke_signed(
         &Instruction::new_with_borsh(
-            *solend_program_info.key,
+            *solend_program.key,
             &LendingInstruction::InitObligation,
             vec![
                 AccountMeta::new(*obligation_info.key, false),
@@ -420,12 +422,12 @@ fn init_solend_obligation(
                 AccountMeta::new(*obligation_owner_info.key, true),
                 AccountMeta::new_readonly(*clock_info.key, false),
                 AccountMeta::new_readonly(*rent_info.key, false),
-                AccountMeta::new_readonly(*token_program_id.key, false)
+                AccountMeta::new_readonly(*token_program.key, false)
             ]
         ),
         &[obligation_info.clone(), lending_market_info.clone(), obligation_owner_info.clone(),
-          clock_info.clone(), rent_info.clone(), token_program_id.clone(), solend_program_info.clone()],
-        &[&[&seed.as_bytes(), &[bump]]],
+          clock_info.clone(), rent_info.clone(), token_program.clone(), solend_program.clone()],
+        &[&[&pda_seed.as_bytes(), &[bump]]],
     )?;
 
     Ok(())

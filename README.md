@@ -60,3 +60,33 @@ Unwrap an amount of a fluid token and receive the equivalent amount of its base 
 | `pyth_price_feed_info`          | The associated pyth price feed.                                                   |
 | `switchboard_feed_info`         | The associated switchboard feed.                                                  |
 | `clock_info`                    | The Solana clock sysvar.                                                          |
+
+## Payout (amount, token\_name, bump\_seed)
+
+Payout two accounts by minting an amount of the token into both token accounts. Requires the name of the token to be provided in upper case, as well as the bump seed of the program's derived obligation authority account for that token.
+
+### Accounts
+
+| Name               | Description                                                            |
+| `token_program`    | The spl-token program.                                                 |
+| `fluidity_mint`    | The mint of the fluid token.                                           |
+| `pda_account`      | The obligation account for the target token derived from this program. |
+| `payout_account_a` | One of the fluidity token accounts to mint to.                         |
+| `payout_account_b` | One of the fluidity token accounts to mint to.                         |
+| `payer`            | The sender of the transaction. Must match authorised authority.        |
+
+## InitSolendObligation (obligation\_lamports, obigation\_size, token\_name, bump\_seed)
+
+Initialise a solend obligation owned by this program's derived account for the specified token. Requires the name of the token to be provided in upper case, as well as the bump seed of the program's derived obligation authority account for that token.
+
+### Accounts
+
+| Name                    | Description                                                |
+| `payer`                 | The sender of the transaction.                             |
+| `solend_program`        | The solend lending program.                                |
+| `system_program`        | The Solana system program.                                 |
+| `obligation_info`       | The obligation being initialised                           |
+| `obligation_owner_info` | The account to own the obligation (solend market account). |
+| `clock_info`            | The Solana clock sysvar.                                   |
+| `rent_info`             | The Solana rent sysvar.                                    |
+| `token_program`         | The spl-token program.                                     |
