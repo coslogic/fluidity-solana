@@ -540,7 +540,7 @@ fn init_data(
 fn check_mints_and_pda(data_account: &AccountInfo, token_mint: Pubkey, fluid_mint: Pubkey, pda: Pubkey) {
     // get fluidity data
     let data = data_account.try_borrow_data().unwrap();
-    let fluidity_data = FluidityData::try_from_slice(&data).unwrap();
+    let fluidity_data = FluidityData::deserialize(&mut &data[..]).unwrap();
 
     // check that mints and pda are consistent
     if (fluidity_data.token_mint, fluidity_data.fluid_mint, fluidity_data.pda) !=
@@ -552,10 +552,10 @@ fn check_mints_and_pda(data_account: &AccountInfo, token_mint: Pubkey, fluid_min
 pub fn process(_program_id: &Pubkey, accounts: &[AccountInfo], input: &[u8]) -> ProgramResult {
     let instruction = FluidityInstruction::try_from_slice(input)?;
     match instruction {
-        FluidityInstruction::Wrap(amount, seed, bump) => {
+        FluidityInstruction::Wrap (amount, seed, bump) => {
             return wrap(&accounts, amount, seed, bump);
         }
-        FluidityInstruction::Unwrap(amount, seed, bump) => {
+        FluidityInstruction::Unwrap (amount, seed, bump) => {
             return unwrap(&accounts, amount, seed, bump);
         }
         FluidityInstruction::Payout (amount, seed, bump) => {
