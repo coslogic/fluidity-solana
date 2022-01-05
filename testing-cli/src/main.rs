@@ -88,7 +88,8 @@ fn test_smart_contract(client: &RpcClient) {
     }
 
     if let Ok(data_account) = client.get_account_data(&data_pubkey) {
-        println!("{:?}", FluidityData::try_from_slice(&data_account[..]).unwrap());
+        //println!("{:?}", FluidityData::try_from_slice(&data_account[0..std::mem::size_of::<FluidityData>()]).unwrap());
+        println!("{:?}", FluidityData::deserialize(&mut &data_account[..]).unwrap());
     }
 
     match command.as_str() {
