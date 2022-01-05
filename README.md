@@ -3,6 +3,18 @@
 
 Fluidity solana implementation. Implements a "factory" for distributing fluid tokens.
 
+## Building
+
+	make build
+
+Ensure that solana environment is correctly set up.
+
+## Deploy
+
+	make deploy
+
+Ensure that solana environment is correctly set up.
+
 ## Wrap(amount, token\_name, bump\_seed)
 
 Wrap an amount of one token into the equivalent amount of its fluid analog. Requires the name of the token to be provided in upper case, as well as the bump seed of the program's derived obligation authority account for that token.
