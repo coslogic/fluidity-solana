@@ -42,6 +42,8 @@ fn wrap(accounts: &[AccountInfo], amount: u64, seed: String, bump: u8) -> Progra
     let sender = next_account_info(accounts_iter)?;
     let token_account = next_account_info(accounts_iter)?;
     let fluidity_account = next_account_info(accounts_iter)?;
+
+    // Accounts to pass through to solend - not being verified by us
     let solend_program = next_account_info(accounts_iter)?;
     let collateral_info = next_account_info(accounts_iter)?;
     let reserve_info = next_account_info(accounts_iter)?;
@@ -54,6 +56,10 @@ fn wrap(accounts: &[AccountInfo], amount: u64, seed: String, bump: u8) -> Progra
     let pyth_price_info = next_account_info(accounts_iter)?;
     let switchboard_feed_info = next_account_info(accounts_iter)?;
     let clock_info = next_account_info(accounts_iter)?;
+
+    if amount < 2 {
+        panic!("Amount of liquidity less than two, Solend rounding error!");
+    }
 
     // create seed strings following format
     let pda_seed = format!("FLU:{}_OBLIGATION", seed);
@@ -443,6 +449,16 @@ pub fn log_tvl(accounts: &[AccountInfo]) -> ProgramResult {
     let switchboard_feed_info = next_account_info(accounts_iter)?;
     let clock_info = next_account_info(accounts_iter)?;
 
+    // check that data account is derived from pda
+    if fluidity_data_account.key !=
+        &Pubkey::create_with_seed(
+            pda_account.key,
+            b"FLU:TVL_DATA",
+            fluidity_data_account.owner
+        ).unwrap() {
+            panic!("bad data account");
+    }
+
     invoke(
         &Instruction::new_with_borsh(
             *solend_program.key,
@@ -487,10 +503,13 @@ pub fn log_tvl(accounts: &[AccountInfo]) -> ProgramResult {
     // get data
     let mut data = data_account.try_borrow_mut_data()?;
 
-    // serialize value into data account
-    //msg!("{:?}", obligation.deposits);
-    //msg!("scaled {}", u64::try_from(obligation.deposited_value.to_scaled_val()?/10u128.pow(12)).unwrap());
-    u64::try_from(obligation.deposited_value.to_scaled_val()?/10u128.pow(12)).unwrap().serialize(&mut &mut data[..])?;
+    // serialize value of obligations (incl. interest) into data account
+    // get scaled u128 val. it has 18 decimal places so divide by 10e12 to get six
+    let deposited_value = obligation.deposited_value.to_scaled_val()?;
+
+    u64::try_from(
+        deposited_value/10u128.pow(12)
+    ).unwrap().serialize(&mut &mut data[..])?;
 
     Ok(())
 }
@@ -537,6 +556,8 @@ fn init_data(
     Ok(())
 }
 
+// check that base mint, fluid mint, and pda match those specified in the data account
+// before doing this, check that the data account is valid!
 fn check_mints_and_pda(data_account: &AccountInfo, token_mint: Pubkey, fluid_mint: Pubkey, pda: Pubkey) {
     // get fluidity data
     let data = data_account.try_borrow_data().unwrap();
