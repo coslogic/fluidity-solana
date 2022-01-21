@@ -23,6 +23,9 @@ use {
     spl_token,
 };
 
+// the public key of the authority for payouts and initialisation
+const AUTHORITY: &str = "sohTpNitFg3WZeEcbrMunnwoZJWP4t8yisPB5o3DGD5";
+
 // struct defining fludity data account
 #[derive(BorshDeserialize, BorshSerialize, Debug, PartialEq, Clone)]
 pub struct FluidityData {
@@ -31,7 +34,7 @@ pub struct FluidityData {
     pda: Pubkey,
 }
 
-fn wrap(accounts: &[AccountInfo], amount: u64, seed: String, bump: u8) -> ProgramResult {
+fn wrap(accounts: &[AccountInfo], program_id: &Pubkey, amount: u64, seed: String, bump: u8) -> ProgramResult {
     let accounts_iter = &mut accounts.iter();
 
     let fluidity_data_account = next_account_info(accounts_iter)?;
@@ -70,7 +73,7 @@ fn wrap(accounts: &[AccountInfo], amount: u64, seed: String, bump: u8) -> Progra
         &Pubkey::create_with_seed(
             pda_account.key,
             &data_seed,
-            fluidity_data_account.owner
+            program_id,
         ).unwrap() {
             panic!("bad data account");
     }
@@ -185,7 +188,7 @@ fn wrap(accounts: &[AccountInfo], amount: u64, seed: String, bump: u8) -> Progra
     Ok(())
 }
 
-fn unwrap(accounts: &[AccountInfo], amount: u64, seed: String, bump: u8) -> ProgramResult {
+fn unwrap(accounts: &[AccountInfo], program_id: &Pubkey, amount: u64, seed: String, bump: u8) -> ProgramResult {
     let accounts_iter = &mut accounts.iter();
 
     let fluidity_data_account = next_account_info(accounts_iter)?;
@@ -218,7 +221,7 @@ fn unwrap(accounts: &[AccountInfo], amount: u64, seed: String, bump: u8) -> Prog
         &Pubkey::create_with_seed(
             pda_account.key,
             &data_seed,
-            fluidity_data_account.owner
+            program_id,
         ).unwrap() {
             panic!("bad data account");
     }
@@ -337,15 +340,45 @@ fn payout(accounts: &[AccountInfo], amount: u64, seed: String, bump: u8) -> Prog
     let token_program = next_account_info(accounts_iter)?;
     let fluidity_mint = next_account_info(accounts_iter)?;
     let pda_account = next_account_info(accounts_iter)?;
+    let obligation_info = next_account_info(accounts_iter)?;
     let payout_account_a = next_account_info(accounts_iter)?;
     let payout_account_b = next_account_info(accounts_iter)?;
     let payer = next_account_info(accounts_iter)?;
 
     // check payout authority
     if !(payer.is_signer && payer.key ==
-         &Pubkey::from_str("sohTpNitFg3WZeEcbrMunnwoZJWP4t8yisPB5o3DGD5").unwrap()) {
+         &Pubkey::from_str(AUTHORITY).unwrap()) {
         panic!("bad payout authority!");
     }
+
+    // scale/clamp amount to be AT MOST 80% of the prize pool
+
+    // get obligation struct
+    let obligation = Obligation::unpack(&obligation_info.data.borrow())?;
+    // get value of obligations as u128 (current has 18 decimals)
+    let deposited_value = obligation.deposited_value.to_scaled_val()?;
+    // convert to u64 with correct (6) decimals
+    let tvl = u64::try_from(
+        deposited_value/10u128.pow(12)
+    ).unwrap();
+
+    // get fluidity mint object
+    let fluid_mint = spl_token::state::Mint::unpack(&fluidity_mint.data.borrow())?;
+    // get amount of usdc deposited (has 6 decimals)
+    let deposited_tokens = fluid_mint.supply;
+    // get available prize pool (80% of pool)
+    let available_prize_pool = (tvl - deposited_tokens) * 8 / 10;
+
+    // set new amount
+    let scaled_amount = if amount > available_prize_pool {
+        available_prize_pool
+    } else {
+        amount
+    };
+
+    // separate pool into 8:2 split between sender and receiver
+    let sender_prize = scaled_amount * 8 / 10;
+    let receiver_prize = scaled_amount * 2 / 10;
 
     let pda_seed =  format!("FLU:{}_OBLIGATION", seed);
 
@@ -357,7 +390,7 @@ fn payout(accounts: &[AccountInfo], amount: u64, seed: String, bump: u8) -> Prog
             &payout_account_a.key,
             &pda_account.key,
             &[&pda_account.key],
-            amount,
+            sender_prize,
         ).unwrap(),
         &[fluidity_mint.clone(), payout_account_a.clone(), pda_account.clone(), token_program.clone()],
         &[&[&pda_seed.as_bytes(), &[bump]]],
@@ -370,7 +403,7 @@ fn payout(accounts: &[AccountInfo], amount: u64, seed: String, bump: u8) -> Prog
             &payout_account_b.key,
             &pda_account.key,
             &[&pda_account.key],
-            amount,
+            receiver_prize,
         ).unwrap(),
         &[fluidity_mint.clone(), payout_account_b.clone(), pda_account.clone(), token_program.clone()],
         &[&[&pda_seed.as_bytes(), &[bump]]],
@@ -397,6 +430,12 @@ fn init_solend_obligation(
     let clock_info = next_account_info(accounts_iter)?;
     let rent_info = next_account_info(accounts_iter)?;
     let token_program = next_account_info(accounts_iter)?;
+
+    // check payout authority
+    if !(payer.is_signer && payer.key ==
+         &Pubkey::from_str(AUTHORITY).unwrap()) {
+        panic!("bad init authority!");
+    }
 
     let pda_seed =  format!("FLU:{}_OBLIGATION", seed);
 
@@ -438,10 +477,11 @@ fn init_solend_obligation(
     Ok(())
 }
 
-pub fn log_tvl(accounts: &[AccountInfo]) -> ProgramResult {
+pub fn log_tvl(accounts: &[AccountInfo], program_id: &Pubkey) -> ProgramResult {
     let accounts_iter = &mut accounts.iter();
 
     let data_account = next_account_info(accounts_iter)?;
+    let base = next_account_info(accounts_iter)?;
     let solend_program = next_account_info(accounts_iter)?;
     let obligation_info = next_account_info(accounts_iter)?;
     let reserve_info = next_account_info(accounts_iter)?;
@@ -450,11 +490,11 @@ pub fn log_tvl(accounts: &[AccountInfo]) -> ProgramResult {
     let clock_info = next_account_info(accounts_iter)?;
 
     // check that data account is derived from pda
-    if fluidity_data_account.key !=
+    if data_account.key !=
         &Pubkey::create_with_seed(
-            pda_account.key,
-            b"FLU:TVL_DATA",
-            fluidity_data_account.owner
+            base.key,
+            "FLU:TVL_DATA",
+            program_id,
         ).unwrap() {
             panic!("bad data account");
     }
@@ -516,6 +556,7 @@ pub fn log_tvl(accounts: &[AccountInfo]) -> ProgramResult {
 
 fn init_data(
     accounts: &[AccountInfo],
+    program_id: &Pubkey,
     seed: String, lamports: u64,
     space: u64, bump: u8
 ) -> ProgramResult {
@@ -523,11 +564,16 @@ fn init_data(
 
     let system_program = next_account_info(accounts_iter)?;
     let payer = next_account_info(accounts_iter)?;
-    let program = next_account_info(accounts_iter)?;
     let data_account = next_account_info(accounts_iter)?;
     let token_mint = next_account_info(accounts_iter)?;
     let fluid_mint = next_account_info(accounts_iter)?;
     let pda = next_account_info(accounts_iter)?;
+
+    // check payout authority
+    if !(payer.is_signer && payer.key ==
+         &Pubkey::from_str(AUTHORITY).unwrap()) {
+        panic!("bad init authority!");
+    }
 
     let pda_seed = format!("FLU:{}_OBLIGATION", seed);
     let data_seed = format!("FLU:{}_DATA", seed);
@@ -540,7 +586,7 @@ fn init_data(
             &data_seed,
             lamports,
             space,
-            program.key,
+            program_id,
         ),
         &[payer.clone(), data_account.clone(), pda.clone(), system_program.clone()],
         &[&[&pda_seed.as_bytes(), &[bump]]],
@@ -570,26 +616,26 @@ fn check_mints_and_pda(data_account: &AccountInfo, token_mint: Pubkey, fluid_min
     }
 }
 
-pub fn process(_program_id: &Pubkey, accounts: &[AccountInfo], input: &[u8]) -> ProgramResult {
+pub fn process(program_id: &Pubkey, accounts: &[AccountInfo], input: &[u8]) -> ProgramResult {
     let instruction = FluidityInstruction::try_from_slice(input)?;
     match instruction {
         FluidityInstruction::Wrap (amount, seed, bump) => {
-            return wrap(&accounts, amount, seed, bump);
+            wrap(&accounts, program_id, amount, seed, bump)
         }
         FluidityInstruction::Unwrap (amount, seed, bump) => {
-            return unwrap(&accounts, amount, seed, bump);
+            unwrap(&accounts, program_id, amount, seed, bump)
         }
         FluidityInstruction::Payout (amount, seed, bump) => {
-            return payout(&accounts, amount, seed, bump);
+            payout(&accounts, amount, seed, bump)
         }
         FluidityInstruction::InitSolendObligation(obligation_lamports, obligation_size, seed, bump) => {
-            return init_solend_obligation(&accounts, obligation_lamports, obligation_size, seed, bump);
+            init_solend_obligation(&accounts, obligation_lamports, obligation_size, seed, bump)
         }
         FluidityInstruction::LogTVL => {
-            return log_tvl(&accounts);
+            log_tvl(&accounts, program_id)
         }
         FluidityInstruction::InitData(seed, lamports, space, bump) => {
-            return init_data(&accounts, seed, lamports, space, bump);
+            init_data(&accounts, program_id, seed, lamports, space, bump)
         }
-    };
+    }
 }
