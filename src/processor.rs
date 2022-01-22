@@ -34,6 +34,7 @@ pub struct FluidityData {
     pda: Pubkey,
 }
 
+// wrap amount of token into corresponding fluidity token
 fn wrap(accounts: &[AccountInfo], program_id: &Pubkey, amount: u64, seed: String, bump: u8) -> ProgramResult {
     let accounts_iter = &mut accounts.iter();
 
@@ -188,6 +189,7 @@ fn wrap(accounts: &[AccountInfo], program_id: &Pubkey, amount: u64, seed: String
     Ok(())
 }
 
+// unwrap amount of fluid token into corresponding token
 fn unwrap(accounts: &[AccountInfo], program_id: &Pubkey, amount: u64, seed: String, bump: u8) -> ProgramResult {
     let accounts_iter = &mut accounts.iter();
 
@@ -334,6 +336,8 @@ fn unwrap(accounts: &[AccountInfo], program_id: &Pubkey, amount: u64, seed: Stri
     Ok(())
 }
 
+// takes an amount of tokens, and two acounts and pays out in an 8:2 split,
+// totalling at most 80% of the prize pool - must be run by authority
 fn payout(accounts: &[AccountInfo], amount: u64, seed: String, bump: u8) -> ProgramResult {
     let accounts_iter = &mut accounts.iter();
 
@@ -383,6 +387,7 @@ fn payout(accounts: &[AccountInfo], amount: u64, seed: String, bump: u8) -> Prog
     let pda_seed =  format!("FLU:{}_OBLIGATION", seed);
 
     // mint fluid tokens to both receivers
+
     invoke_signed(
         &spl_token::instruction::mint_to(
             &token_program.key,
@@ -412,6 +417,7 @@ fn payout(accounts: &[AccountInfo], amount: u64, seed: String, bump: u8) -> Prog
     Ok(())
 }
 
+// initialise obligation account controlled by PDA - must be run by authority
 fn init_solend_obligation(
     accounts: &[AccountInfo],
     obligation_lamports: u64,
@@ -431,7 +437,7 @@ fn init_solend_obligation(
     let rent_info = next_account_info(accounts_iter)?;
     let token_program = next_account_info(accounts_iter)?;
 
-    // check payout authority
+    // check init authority
     if !(payer.is_signer && payer.key ==
          &Pubkey::from_str(AUTHORITY).unwrap()) {
         panic!("bad init authority!");
@@ -477,6 +483,7 @@ fn init_solend_obligation(
     Ok(())
 }
 
+// takes a data account derived from a base account, and serialises the total value of obligations into it
 pub fn log_tvl(accounts: &[AccountInfo], program_id: &Pubkey) -> ProgramResult {
     let accounts_iter = &mut accounts.iter();
 
@@ -498,6 +505,8 @@ pub fn log_tvl(accounts: &[AccountInfo], program_id: &Pubkey) -> ProgramResult {
         ).unwrap() {
             panic!("bad data account");
     }
+
+    // refresh solend accounts
 
     invoke(
         &Instruction::new_with_borsh(
@@ -554,6 +563,7 @@ pub fn log_tvl(accounts: &[AccountInfo], program_id: &Pubkey) -> ProgramResult {
     Ok(())
 }
 
+// initialise a data account derived from PDA that stores valid token pairs
 fn init_data(
     accounts: &[AccountInfo],
     program_id: &Pubkey,
@@ -578,6 +588,7 @@ fn init_data(
     let pda_seed = format!("FLU:{}_OBLIGATION", seed);
     let data_seed = format!("FLU:{}_DATA", seed);
 
+    // create the acccount
     invoke_signed(
         &system_instruction::create_account_with_seed(
             payer.key,
@@ -592,6 +603,7 @@ fn init_data(
         &[&[&pda_seed.as_bytes(), &[bump]]],
     )?;
 
+    // borrow the data and write
     let mut data = data_account.try_borrow_mut_data()?;
     FluidityData{
         token_mint: *token_mint.key,

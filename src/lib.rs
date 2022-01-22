@@ -17,6 +17,10 @@ mod state;
 mod math;
 mod error;
 
+// declare the pubkey of the program
+declare_id!("GjRwsHMgCAX2QUrw64tyT9RQhqm28fmntNAjgxoaTztU");
+
+// pass entrypoint through to processor
 entrypoint!(process_instruction);
 pub fn process_instruction(
     program_id: &Pubkey,
