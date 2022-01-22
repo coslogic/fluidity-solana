@@ -8,6 +8,7 @@ use {
         entrypoint,
         entrypoint::ProgramResult,
         pubkey::Pubkey,
+        declare_id,
     },
 };
 
