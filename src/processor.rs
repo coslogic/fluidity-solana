@@ -371,7 +371,7 @@ fn payout(accounts: &[AccountInfo], amount: u64, seed: String, bump: u8) -> Prog
     // get amount of usdc deposited (has 6 decimals)
     let deposited_tokens = fluid_mint.supply;
     // get available prize pool (80% of pool)
-    let available_prize_pool = (tvl - deposited_tokens) * 8 / 10;
+    let available_prize_pool = (tvl - deposited_tokens).checked_mul(8 / 10).unwrap();
 
     // set new amount
     let scaled_amount = if amount > available_prize_pool {
@@ -381,8 +381,8 @@ fn payout(accounts: &[AccountInfo], amount: u64, seed: String, bump: u8) -> Prog
     };
 
     // separate pool into 8:2 split between sender and receiver
-    let sender_prize = scaled_amount * 8 / 10;
-    let receiver_prize = scaled_amount * 2 / 10;
+    let sender_prize = scaled_amount.checked_mul(8 / 10).unwrap();
+    let receiver_prize = scaled_amount.checked_mul(2 / 10).unwrap();
 
     let pda_seed =  format!("FLU:{}_OBLIGATION", seed);
 
