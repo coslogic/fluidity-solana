@@ -1,5 +1,5 @@
+// Error types from github.com/solendprotocol
 //! Error types
-// taken from https://github.com/solendprotocol/solana-program-library/blob/master/token-lending/program/src/error.rs
 
 use num_derive::FromPrimitive;
 use solana_program::{decode_error::DecodeError, program_error::ProgramError};
