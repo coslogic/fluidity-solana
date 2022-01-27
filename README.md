@@ -1,7 +1,8 @@
 
 # fluidity-solana
 
-Fluidity solana implementation. Implements a "factory" for distributing fluid tokens.
+Fluidity solana implementation. Implements a "factory" for distributing
+fluid tokens.
 
 ## Building
 
@@ -17,7 +18,10 @@ Ensure that solana environment is correctly set up.
 
 ## Wrap(amount, token\_name, bump\_seed)
 
-Wrap an amount of one token into the equivalent amount of its fluid analog. Requires the name of the token to be provided in upper case, as well as the bump seed of the program's derived obligation authority account for that token.
+Wrap an amount of one token into the equivalent amount of its fluid
+analog. Requires the name of the token to be provided in upper case,
+as well as the bump seed of the program's derived obligation authority
+account for that token.
 
 ### Accounts
 
@@ -46,7 +50,10 @@ Wrap an amount of one token into the equivalent amount of its fluid analog. Requ
 
 ## Unwrap(amount, token\_name, bump\_seed)
 
-Unwrap an amount of a fluid token and receive the equivalent amount of its base token. Requires the name of the token to be provided in upper case, as well as the bump seed of the program's derived obligation authority account for that token.
+Unwrap an amount of a fluid token and receive the equivalent amount of its
+base token. Requires the name of the token to be provided in upper case,
+as well as the bump seed of the program's derived obligation authority
+account for that token.
 
 ### Accounts
 
@@ -75,7 +82,10 @@ Unwrap an amount of a fluid token and receive the equivalent amount of its base 
 
 ## Payout (amount, token\_name, bump\_seed)
 
-Payout two accounts by minting an amount of the token into both token accounts. Requires the name of the token to be provided in upper case, as well as the bump seed of the program's derived obligation authority account for that token.
+Payout two accounts by minting an amount of the token into both token
+accounts. Requires the name of the token to be provided in upper case,
+as well as the bump seed of the program's derived obligation authority
+account for that token.
 
 ### Accounts
 
@@ -90,7 +100,10 @@ Payout two accounts by minting an amount of the token into both token accounts. 
 
 ## InitSolendObligation (obligation\_lamports, obigation\_size, token\_name, bump\_seed)
 
-Initialise a solend obligation owned by this program's derived account for the specified token. Requires the name of the token to be provided in upper case, as well as the bump seed of the program's derived obligation authority account for that token.
+Initialise a solend obligation owned by this program's derived account
+for the specified token. Requires the name of the token to be provided in
+upper case, as well as the bump seed of the program's derived obligation
+authority account for that token.
 
 ### Accounts
 
@@ -124,7 +137,9 @@ Log the current value of assets held by the factory into a data account.
 
 ## InitData(token\_name, lamports, space, bump\_seed)
 
-Initialise a data account that holds authorised pairs. Requires the name of the token to be provided in upper case, as well as the bump seed of the program's derived obligation authority account for that token.
+Initialise a data account that holds authorised pairs. Requires the name
+of the token to be provided in upper case, as well as the bump seed of
+the program's derived obligation authority account for that token.
 
 ### Accounts
 
