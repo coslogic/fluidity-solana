@@ -9,6 +9,4 @@ WORKDIR /usr/local/src/fluidity-solana
 
 COPY . ./
 
-RUN [ "ls" ]
-
 RUN ["cargo", "build-bpf"]
