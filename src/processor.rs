@@ -496,7 +496,7 @@ pub fn log_tvl(accounts: &[AccountInfo], program_id: &Pubkey) -> ProgramResult {
     let switchboard_feed_info = next_account_info(accounts_iter)?;
     let clock_info = next_account_info(accounts_iter)?;
 
-    // check that data account is derived from pda
+    // check that data account is derived from base
     if data_account.key !=
         &Pubkey::create_with_seed(
             base.key,
