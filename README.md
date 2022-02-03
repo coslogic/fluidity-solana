@@ -128,6 +128,7 @@ Log the current value of assets held by the factory into a data account.
 |-------------------------|---------------------------------------------------------------------|
 | `data_account`          | The account to log the tvl into. Must be writeable by this program. |
 | `base`                  | The account that the data_account is derived from.                  |
+| `fluidity_mint`         | The mint of the fluid token. Used to get correct decimal places.    |
 | `solend_program`        | The solend lending program.                                         |
 | `obligation_info`       | The PDA account's obligation account.                               |
 | `reserve_info`          | The associated solend reserve.                                      |

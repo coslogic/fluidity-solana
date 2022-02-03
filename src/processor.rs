@@ -361,17 +361,24 @@ fn payout(accounts: &[AccountInfo], amount: u64, seed: String, bump: u8) -> Prog
     let obligation = Obligation::unpack(&obligation_info.data.borrow())?;
     // get value of obligations as u128 (current has 18 decimals)
     let deposited_value = obligation.deposited_value.to_scaled_val()?;
-    // convert to u64 with correct (6) decimals
-    let tvl = u64::try_from(
-        deposited_value/10u128.pow(12)
-    ).unwrap();
-
+    // normalise
     // get fluidity mint object
     let fluid_mint = spl_token::state::Mint::unpack(&fluidity_mint.data.borrow())?;
+    let decimals = fluid_mint.decimals;
+
+    // convert to u64 with correct decimals
+    // solend gives us 1e18 times the actual amount, which we want to adjust to be
+    // consistent with spl-token decimals
+    let tvl = u64::try_from(
+        deposited_value/10u128.pow(18 - decimals)
+    ).unwrap();
+
     // get amount of usdc deposited (has 6 decimals)
     let deposited_tokens = fluid_mint.supply;
     // get available prize pool (80% of pool)
-    let available_prize_pool = (tvl - deposited_tokens).checked_mul(8 / 10).unwrap();
+    let available_prize_pool = (tvl - deposited_tokens)
+        .checked_mul(8).unwrap()
+        .checked_div(10).unwrap();
 
     // set new amount
     let scaled_amount = if amount > available_prize_pool {
@@ -381,8 +388,12 @@ fn payout(accounts: &[AccountInfo], amount: u64, seed: String, bump: u8) -> Prog
     };
 
     // separate pool into 8:2 split between sender and receiver
-    let sender_prize = scaled_amount.checked_mul(8 / 10).unwrap();
-    let receiver_prize = scaled_amount.checked_mul(2 / 10).unwrap();
+    let sender_prize = scaled_amount
+        .checked_mul(8).unwrap()
+        .checked_div(10).unwrap();
+    let receiver_prize = scaled_amount
+        .checked_mul(2).unwrap()
+        .checked_div(10).unwrap();
 
     let pda_seed =  format!("FLU:{}_OBLIGATION", seed);
 
@@ -489,6 +500,7 @@ pub fn log_tvl(accounts: &[AccountInfo], program_id: &Pubkey) -> ProgramResult {
 
     let data_account = next_account_info(accounts_iter)?;
     let base = next_account_info(accounts_iter)?;
+    let fluid_mint = next_account_info(accounts_iter)?;
     let solend_program = next_account_info(accounts_iter)?;
     let obligation_info = next_account_info(accounts_iter)?;
     let reserve_info = next_account_info(accounts_iter)?;
@@ -553,11 +565,15 @@ pub fn log_tvl(accounts: &[AccountInfo], program_id: &Pubkey) -> ProgramResult {
     let mut data = data_account.try_borrow_mut_data()?;
 
     // serialize value of obligations (incl. interest) into data account
-    // get scaled u128 val. it has 18 decimal places so divide by 10e12 to get six
+    // get scaled u128 val. it has 18 decimal places so divide by 1e18-n to get n decimals
     let deposited_value = obligation.deposited_value.to_scaled_val()?;
 
+    // get decimals for normalisation
+    let fluid_mint = spl_token::state::Mint::unpack(&fluidity_mint.data.borrow())?;
+    let decimals = fluid_mint.decimals;
+
     u64::try_from(
-        deposited_value/10u128.pow(12)
+        deposited_value/10u128.pow(18 - decimals)
     ).unwrap().serialize(&mut &mut data[..])?;
 
     Ok(())
