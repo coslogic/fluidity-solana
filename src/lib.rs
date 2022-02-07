@@ -12,8 +12,8 @@ use {
     },
 };
 
-mod instruction;
-mod processor;
+pub mod instruction;
+pub mod processor;
 mod state;
 mod math;
 mod error;
