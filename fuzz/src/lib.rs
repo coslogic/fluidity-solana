@@ -1,5 +1,6 @@
 #![deny(unaligned_references)]
 use std::mem::size_of;
+use std::{str::FromStr};
 
 use bumpalo::Bump;
 use safe_transmute::to_bytes::{transmute_to_bytes, transmute_to_bytes_mut};
@@ -10,13 +11,13 @@ use solana_program::entrypoint::ProgramResult;
 use solana_program::program_pack::Pack;
 use solana_program::pubkey::Pubkey;
 use solana_program::rent::Rent;
-use solana_program::system_program;
+use solana_program::system_program; // Core account library
 use solana_program::sysvar;
 use solana_program::sysvar::Sysvar;
 use spl_token::state::Account as SplAccount;
 use spl_token::state::Mint;
 
-use solana_fluidity::processor;
+use fluidity;
 
 pub struct FluidityAccounts<'bump> {
     pub base: AccountInfo<'bump>,
@@ -224,10 +225,12 @@ pub fn setup_payout_keys(bump: &Bump) -> PayoutAccounts {
 
     let token_program = create_spl_token_program(bump);
     let fluidity_mint = create_token_mint(bump, rent);
+    // Derived acc -> Pubkey::create_with_seed CLI/src/utils
+    // let pda_account = derived_acc (seed, bump seed)
     let pda_account = create_sol_acc(0, bump);
-    let obligation_info = create_sol_acc(0, bump);
+    let obligation_info = create_sol_acc(0, bump);// derived acc, Owned by solend program, auth pda
     
-    let payer = create_signer_acc(&Pubkey::from_str(AUTHORITY).unwrap(), bump);
+    let payer = create_signer_acc(random_pubkey(bump), bump);
 
     let payout_account_a = create_token_acc(fluidity_mint.key,
         payer.key,
@@ -260,7 +263,7 @@ pub fn process_instruction<'a>(program_id: &Pubkey, accounts: &[AccountInfo<'a>]
         .iter()
         .map(|account| account.try_borrow_data().unwrap().to_vec())
         .collect();
-    let result = processor.process(program_id, accounts, &instruction_data);
+    let result = fluidity::process_instruction(program_id, accounts, &instruction_data);
     if result.is_err() {
         for (account, original) in accounts.iter().zip(original_data) {
             let mut data = account.try_borrow_mut_data().unwrap();
