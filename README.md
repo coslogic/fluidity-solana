@@ -124,17 +124,17 @@ Log the current value of assets held by the factory into a data account.
 
 ### Accounts
 
-| Name                    | Description                                                         |
-|-------------------------|---------------------------------------------------------------------|
-| `data_account`          | The account to log the tvl into. Must be writeable by this program. |
-| `base`                  | The account that the data_account is derived from.                  |
-| `fluidity_mint`         | The mint of the fluid token. Used to get correct decimal places.    |
-| `solend_program`        | The solend lending program.                                         |
-| `obligation_info`       | The PDA account's obligation account.                               |
-| `reserve_info`          | The associated solend reserve.                                      |
-| `pyth_price_feed_info`  | The associated pyth price feed.                                     |
-| `switchboard_feed_info` | The associated switchboard feed.                                    |
-| `clock_info`            | The Solana clock sysvar.                                            |
+| Name                    | Description                                                                          |
+|-------------------------|--------------------------------------------------------------------------------------|
+| `data_account`          | The account to log the tvl into. Must be writeable by this program.                  |
+| `base`                  | The account that the data_account is derived from.                                   |
+| `fluidity_mint`         | NOT CURRENTLY USED! The mint of the fluid token. Used to get correct decimal places. |
+| `solend_program`        | The solend lending program.                                                          |
+| `obligation_info`       | The PDA account's obligation account.                                                |
+| `reserve_info`          | The associated solend reserve.                                                       |
+| `pyth_price_feed_info`  | The associated pyth price feed.                                                      |
+| `switchboard_feed_info` | The associated switchboard feed.                                                     |
+| `clock_info`            | The Solana clock sysvar.                                                             |
 
 ## InitData(token\_name, lamports, space, bump\_seed)
 

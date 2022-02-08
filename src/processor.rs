@@ -364,7 +364,7 @@ fn payout(accounts: &[AccountInfo], amount: u64, seed: String, bump: u8) -> Prog
     // normalise
     // get fluidity mint object
     let fluid_mint = spl_token::state::Mint::unpack(&fluidity_mint.data.borrow())?;
-    let decimals = fluid_mint.decimals;
+    let decimals = fluid_mint.decimals as u32;
 
     // convert to u64 with correct decimals
     // solend gives us 1e18 times the actual amount, which we want to adjust to be
@@ -500,7 +500,6 @@ pub fn log_tvl(accounts: &[AccountInfo], program_id: &Pubkey) -> ProgramResult {
 
     let data_account = next_account_info(accounts_iter)?;
     let base = next_account_info(accounts_iter)?;
-    let fluid_mint = next_account_info(accounts_iter)?;
     let solend_program = next_account_info(accounts_iter)?;
     let obligation_info = next_account_info(accounts_iter)?;
     let reserve_info = next_account_info(accounts_iter)?;
@@ -569,8 +568,7 @@ pub fn log_tvl(accounts: &[AccountInfo], program_id: &Pubkey) -> ProgramResult {
     let deposited_value = obligation.deposited_value.to_scaled_val()?;
 
     // get decimals for normalisation
-    let fluid_mint = spl_token::state::Mint::unpack(&fluidity_mint.data.borrow())?;
-    let decimals = fluid_mint.decimals;
+    let decimals = 6;
 
     u64::try_from(
         deposited_value/10u128.pow(18 - decimals)
