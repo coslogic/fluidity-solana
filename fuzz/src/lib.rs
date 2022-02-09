@@ -17,7 +17,7 @@ use solana_program::sysvar::Sysvar;
 use spl_token::state::Account as SplAccount;
 use spl_token::state::Mint;
 
-use fluidity;
+use fluidity::processor::process;
 
 pub struct FluidityAccounts<'bump> {
     pub base: AccountInfo<'bump>,
@@ -63,25 +63,22 @@ pub struct PayoutAccounts<'bump> {
     pub payer: AccountInfo<'bump>,
 }
 
-// the public key of the authority for payouts and initialisation
-const AUTHORITY: &str = "sohTpNitFg3WZeEcbrMunnwoZJWP4t8yisPB5o3DGD5";
-
-fn random_pubkey(bump: &Bump) -> &Pubkey {
+pub fn random_pubkey(bump: &Bump) -> &Pubkey {
     bump.alloc(Pubkey::new(transmute_to_bytes(&rand::random::<[u64; 4]>())))
 }
 
-fn pad_bpf_data_size(unpadded_size: usize) -> usize {
+pub fn pad_bpf_data_size(unpadded_size: usize) -> usize {
     unpadded_size + 12
 }
 
-fn allocate_contract_data(data_size: usize, bump: &Bump) -> &mut [u8] {
+pub fn allocate_contract_data(data_size: usize, bump: &Bump) -> &mut [u8] {
     assert_eq!(data_size % 8, 0);
     let padded_data_size = pad_bpf_data_size(data_size);
     let u64_data = bump.alloc_slice_fill_copy(padded_data_size / 8 + 1, 0u64);
     &mut transmute_to_bytes_mut(u64_data)[3..padded_data_size + 3]
 }
 
-fn create_contract_acc<'bump>(data_size: usize, contract_addr: &'bump Pubkey, bump: &'bump Bump, rent: Rent) -> AccountInfo<'bump> {
+pub fn create_contract_acc<'bump>(data_size: usize, contract_addr: &'bump Pubkey, bump: &'bump Bump, rent: Rent) -> AccountInfo<'bump> {
     let padded_data_size = pad_bpf_data_size(data_size);
     let lamports = rent.minimum_balance(padded_data_size);
     AccountInfo::new(
@@ -96,7 +93,7 @@ fn create_contract_acc<'bump>(data_size: usize, contract_addr: &'bump Pubkey, bu
     )
 }
 
-fn create_token_acc<'bump, 'a, 'b>(
+pub fn create_token_acc<'bump, 'a, 'b>(
     mint_pubkey: &'a Pubkey,
     owner_pubkey: &'b Pubkey,
     balance: u64,
@@ -123,7 +120,7 @@ fn create_token_acc<'bump, 'a, 'b>(
     )
 }
 
-fn create_token_mint(bump: &Bump, rent: Rent) -> AccountInfo {
+pub fn create_token_mint(bump: &Bump, rent: Rent) -> AccountInfo {
     let data = bump.alloc_slice_fill_copy(Mint::LEN, 0u8);
     let mut mint = Mint::default();
     mint.is_initialized = true;
@@ -141,11 +138,11 @@ fn create_token_mint(bump: &Bump, rent: Rent) -> AccountInfo {
     )
 }
 
-fn create_sol_acc(lamports: u64, bump: &Bump) -> AccountInfo {
+pub fn create_sol_acc(lamports: u64, bump: &Bump) -> AccountInfo {
     create_sol_acc_with_pubkey(random_pubkey(bump), lamports, bump)
 }
 
-fn create_sol_acc_with_pubkey<'bump>(
+pub fn create_sol_acc_with_pubkey<'bump>(
     pubkey: &'bump Pubkey,
     lamports: u64,
     bump: &'bump Bump,
@@ -162,7 +159,7 @@ fn create_sol_acc_with_pubkey<'bump>(
     )
 }
 
-fn create_spl_token_program(bump: &Bump) -> AccountInfo {
+pub fn create_spl_token_program(bump: &Bump) -> AccountInfo {
     AccountInfo::new(
         &spl_token::ID,    // Pubkey
         false,             // Is signer
@@ -175,7 +172,7 @@ fn create_spl_token_program(bump: &Bump) -> AccountInfo {
     )
 }
 
-fn create_rent_sysvar_acc(lamports: u64, rent: Rent, bump: &Bump) -> AccountInfo {
+pub fn create_rent_sysvar_acc(lamports: u64, rent: Rent, bump: &Bump) -> AccountInfo {
     let data = bump.alloc_slice_fill_copy(size_of::<Rent>(), 0u8);
     let mut account_info = AccountInfo::new(
         &sysvar::rent::ID,    // Pubkey
@@ -204,7 +201,7 @@ fn create_rent_sysvar_acc(lamports: u64, rent: Rent, bump: &Bump) -> AccountInfo
 //     Ok(Pubkey::create_program_address)
 // }
 
-fn create_signer_acc<'bump>(pubkey: &'bump Pubkey, bump: &'bump Bump) -> AccountInfo<'bump> {
+pub fn create_signer_acc<'bump>(pubkey: &'bump Pubkey, bump: &'bump Bump) -> AccountInfo<'bump> {
     AccountInfo::new(
         pubkey,             // Pubkey
         true,               // Is signer
@@ -225,6 +222,9 @@ pub fn setup_payout_keys(bump: &Bump) -> PayoutAccounts {
 
     let token_program = create_spl_token_program(bump);
     let fluidity_mint = create_token_mint(bump, rent);
+    let pda_account_seed = format!("FLU:{}_OBLIGATION", "USDC");   // TODO: Change this when we support more toks
+    let (pda_pubkey, _) = Pubkey::find_program_address(&[pda_account_seed.as_bytes()], &contract_key);
+    // let pda_account = Pubkey::create_with_seed(&pda_pubkey, &data_account_seed, &program_id).unwrap();
     // Derived acc -> Pubkey::create_with_seed CLI/src/utils
     // let pda_account = derived_acc (seed, bump seed)
     let pda_account = create_sol_acc(0, bump);

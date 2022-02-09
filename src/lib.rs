@@ -6,10 +6,8 @@ use solana_program::{entrypoint, declare_id};
 use {
     solana_program::{
         account_info::AccountInfo,
-        // entrypoint,
         entrypoint::ProgramResult,
         pubkey::Pubkey,
-        // declare_id,
     },
 };
 
