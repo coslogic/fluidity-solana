@@ -41,3 +41,9 @@ name = "fuzz_log_tvl"
 path = "fuzz_targets/fuzz_log_tvl.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "fuzz_wrap"
+path = "fuzz_targets/fuzz_wrap.rs"
+test = false
+doc = false

@@ -6,10 +6,6 @@
 Fuzzer will generate a random slice of bytes until it panics. It is useful for integration tests, and making sure public functions work as intended, even with extreme input.
 
 ## Running Fuzzers
-### All Fuzzers
-`make fuzzy`
-
-### Specific Fuzzers
 1. `cargo fuzz list -> <NAME>`
 
 2. `make fuzzy <NAME>`
