@@ -2,17 +2,17 @@
 REPO := fluidity-solana
 
 CARGO_BUILD_BPF := cargo build-bpf
-DOCKER_BUILD := docker build
-
 CARGO_FUZZ := cargo +nightly fuzz run
 CARGO_FUZZ_INIT := cargo +nightly fuzz init
+
+DOCKER_BUILD := docker build
 FUZZ_FILES := $(shell cargo fuzz list)
 
 SRC_FILES := $(shell find src Xargo.toml Cargo.*)
 
 OUT_BPF := target/deploy/fluidity.so
 
-.PHONY: build clean
+.PHONY: build clean test
 
 all: build
 
@@ -25,8 +25,11 @@ docker: ${SRC_FILES} Dockerfile
 	@${DOCKER_BUILD} -t ${REPO} .
 	@touch docker
 
-fuzzy:
+cargo_fuzz: ${SRC_FILES}
 	@${CARGO_FUZZ} ${FUZZ_FILES}
+	@touch cargo_fuzz
+
+test: cargo_fuzz
 
 clean:
-	@rm -rf target docker
+	@rm -rf target docker cargo_fuzz
