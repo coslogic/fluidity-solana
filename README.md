@@ -153,3 +153,9 @@ the program's derived obligation authority account for that token.
 | `token_mint`     | The base token of the authorised pair.                                                      |
 | `fluid_mint`     | The fluid token of the authorised pair.                                                     |
 | `pda`            | The obligation authority account for the target token, derived from this program.           |
+
+## Testing
+
+### Installing Dependencies
+
+	`cargo install cargo-fuzz`

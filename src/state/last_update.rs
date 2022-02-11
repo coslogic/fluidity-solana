@@ -56,3 +56,16 @@ impl PartialOrd for LastUpdate {
         self.slot.partial_cmp(&other.slot)
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_init_last_update() {
+        let slot_id = 42;
+        let new_update = LastUpdate::new(slot_id as Slot);
+        assert_eq!(new_update.stale, true);
+        assert_eq!(new_update.slot, slot_id as Slot);
+    }
+}
