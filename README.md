@@ -158,4 +158,4 @@ the program's derived obligation authority account for that token.
 
 ### Installing Dependencies
 
-	`cargo install cargo-fuzz`
+`cargo install cargo-fuzz`

@@ -5,10 +5,9 @@ CARGO_BUILD_BPF := cargo build-bpf
 
 CARGO_TEST := cargo test
 
-CARGO_FUZZ := cargo +nightly fuzz run
+CARGO_FUZZ := ./fuzz/run.sh
 
 DOCKER_BUILD := docker build
-FUZZ_FILES := $(shell cargo fuzz list)
 
 SRC_FILES := $(shell find src Xargo.toml Cargo.*)
 
@@ -28,7 +27,7 @@ docker: ${SRC_FILES} Dockerfile
 	@touch docker
 
 cargo_fuzz: ${SRC_FILES}
-	@${CARGO_FUZZ} ${FUZZ_FILES}
+	@${CARGO_FUZZ}
 	@touch cargo_fuzz
 
 cargo_test: ${SRC_FILES}
