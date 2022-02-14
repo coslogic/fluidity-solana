@@ -2,3 +2,4 @@ target
 docker
 cargo_fuzz
 cargo_test
+.coderrect

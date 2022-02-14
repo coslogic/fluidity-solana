@@ -156,6 +156,7 @@ the program's derived obligation authority account for that token.
 
 ## Testing
 
-### Installing Dependencies
+### Installing Testing Dependencies
 
+#### Cargo Fuzz
 `cargo install cargo-fuzz`

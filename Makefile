@@ -7,6 +7,8 @@ CARGO_TEST := cargo test
 
 CARGO_FUZZ := ./fuzz/run.sh
 
+SOTERIA_ANALYZE := ./soteria.sh
+
 DOCKER_BUILD := docker build
 
 SRC_FILES := $(shell find src Xargo.toml Cargo.*)
@@ -33,8 +35,12 @@ cargo_fuzz: ${SRC_FILES}
 cargo_test: ${SRC_FILES}
 	@${CARGO_TEST}
 	@touch cargo_test
+	
+soteria_analyze: ${SRC_FILES}
+	@${SOTERIA_ANALYZE}
+	@touch soteria_analyze
 
-test: cargo_test cargo_fuzz
+test: cargo_test cargo_fuzz soteria_analyze
 
 clean:
-	@rm -rf target docker cargo_fuzz cargo_test
+	@rm -rf target docker cargo_fuzz cargo_test soteria

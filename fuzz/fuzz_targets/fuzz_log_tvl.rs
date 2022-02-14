@@ -10,5 +10,5 @@ fuzz_target!(|data: &[u8]| {
     let bump = Bump::new();
     let fun = FluidityInstruction::LogTVL;
     let program_id = random_pubkey(&bump);
-    process_instruction(program_id, &[], &fun.try_to_vec().unwrap());
+    println!("{:?}",process_instruction(program_id, &[], &fun.try_to_vec().unwrap()));
 });
