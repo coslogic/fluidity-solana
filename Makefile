@@ -5,9 +5,10 @@ CARGO_BUILD_BPF := cargo build-bpf
 
 CARGO_TEST := cargo test
 
-CARGO_FUZZ := ./fuzz/run.sh
+TESTING_DIR := ${PWD}/testing
+CARGO_FUZZ := ${TESTING_DIR}/fuzz/run.sh
 
-SOTERIA_ANALYZE := ./soteria.sh
+SOTERIA_ANALYZE := ${TESTING_DIR}/soteria/soteria.sh
 
 DOCKER_BUILD := docker build
 
@@ -43,4 +44,4 @@ soteria_analyze: ${SRC_FILES}
 test: cargo_test cargo_fuzz soteria_analyze
 
 clean:
-	@rm -rf target docker cargo_fuzz cargo_test soteria
+	@rm -rf target docker cargo_fuzz cargo_test soteria_analyze

@@ -23,7 +23,7 @@ num-traits = "0.2"
 thiserror = "1.0"
 
 [dependencies.solana-fluidity]
-path = ".."
+path = "../.."
 
 # Prevent this from interfering with workspaces
 [workspace]
