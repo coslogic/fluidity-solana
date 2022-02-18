@@ -1018,6 +1018,7 @@ mod test {
 
     proptest! {
         #[test]
+        #[cfg_attr(miri, ignore)] // Miri: unsupported operation: `getcwd` not available when isolation is enabled
         fn current_borrow_rate(
             total_liquidity in 0..=MAX_LIQUIDITY,
             borrowed_percent in 0..=WAD,
@@ -1061,6 +1062,7 @@ mod test {
         }
 
         #[test]
+        #[cfg_attr(miri, ignore)] // Miri: unsupported operation: `getcwd` not available when isolation is enabled
         fn current_utilization_rate(
             total_liquidity in 0..=MAX_LIQUIDITY,
             borrowed_percent in 0..=WAD,
@@ -1077,6 +1079,7 @@ mod test {
         }
 
         #[test]
+        #[cfg_attr(miri, ignore)] // Miri: unsupported operation: `getcwd` not available when isolation is enabled
         fn collateral_exchange_rate(
             total_liquidity in 0..=MAX_LIQUIDITY,
             borrowed_percent in 0..=WAD,
@@ -1121,6 +1124,7 @@ mod test {
         }
 
         #[test]
+        #[cfg_attr(miri, ignore)] // Miri: unsupported operation: `getcwd` not available when isolation is enabled
         fn compound_interest(
             slots_elapsed in 0..=SLOTS_PER_YEAR,
             borrow_rate in 0..=u8::MAX,
@@ -1137,6 +1141,7 @@ mod test {
         }
 
         #[test]
+        #[cfg_attr(miri, ignore)] // Miri: unsupported operation: `getcwd` not available when isolation is enabled
         fn reserve_accrue_interest(
             slots_elapsed in 0..=SLOTS_PER_YEAR,
             borrowed_liquidity in 0..=u64::MAX,
@@ -1165,6 +1170,7 @@ mod test {
         }
 
         #[test]
+        #[cfg_attr(miri, ignore)]   // Miri: unsupported operation: `getcwd` not available when isolation is enabled
         fn borrow_fee_calculation(
             borrow_fee_wad in 0..WAD, // at WAD, fee == borrow amount, which fails
             flash_loan_fee_wad in 0..WAD, // at WAD, fee == borrow amount, which fails
@@ -1208,6 +1214,7 @@ mod test {
         }
 
         #[test]
+        #[cfg_attr(miri, ignore)] // Miri: unsupported operation: `getcwd` not available when isolation is enabled
         fn flash_loan_fee_calculation(
             borrow_fee_wad in 0..WAD, // at WAD, fee == borrow amount, which fails
             flash_loan_fee_wad in 0..WAD, // at WAD, fee == borrow amount, which fails

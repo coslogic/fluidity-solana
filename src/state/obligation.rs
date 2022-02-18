@@ -583,6 +583,7 @@ mod test {
 
     proptest! {
         #[test]
+        #[cfg_attr(miri, ignore)]   // Miri: unsupported operation: `getcwd` not available when isolation is enabled
         fn repay_partial(
             (repay_amount, borrowed_amount) in repay_partial_amounts(),
         ) {
@@ -602,6 +603,7 @@ mod test {
         }
 
         #[test]
+        #[cfg_attr(miri, ignore)]   // Miri: unsupported operation: `getcwd` not available when isolation is enabled
         fn repay_full(
             (repay_amount, borrowed_amount) in repay_full_amounts(),
         ) {
@@ -620,6 +622,7 @@ mod test {
         }
 
         #[test]
+        #[cfg_attr(miri, ignore)]   // Miri: unsupported operation: `getcwd` not available when isolation is enabled
         fn accrue_interest(
             (current_borrow_rate, new_borrow_rate) in cumulative_rates(),
             borrowed_amount in 0..=u64::MAX,
