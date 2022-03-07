@@ -26,6 +26,9 @@ use {
 // the public key of the authority for payouts and initialisation
 const AUTHORITY: &str = "sohTpNitFg3WZeEcbrMunnwoZJWP4t8yisPB5o3DGD5";
 
+// the public key of the solend program
+const SOLEND: &str = "ALend7Ketfx5bxh6ghsCDXAoDrhvEmsXT3cynB6aPLgx";
+
 // struct defining fludity data account
 #[derive(BorshDeserialize, BorshSerialize, Debug, PartialEq, Clone)]
 pub struct FluidityData {
@@ -65,6 +68,12 @@ fn wrap(accounts: &[AccountInfo], program_id: &Pubkey, amount: u64, seed: String
         panic!("Amount of liquidity less than two, Solend rounding error!");
     }
 
+    // check solend contract
+    if solend_program.key !=
+        &Pubkey::from_str(SOLEND).unwrap() {
+        panic!("bad Solend contract!");
+    }
+
     // create seed strings following format
     let pda_seed = format!("FLU:{}_OBLIGATION", seed);
     let data_seed = format!("FLU:{}_DATA", seed);
@@ -81,6 +90,16 @@ fn wrap(accounts: &[AccountInfo], program_id: &Pubkey, amount: u64, seed: String
 
     // check mints
     check_mints_and_pda(&fluidity_data_account, *token_mint.key, *fluidity_mint.key, *pda_account.key);
+
+    // check collateral and obligation ownership
+    let obligation = Obligation::unpack(&obligation_info.data.borrow())?;
+    if &obligation.owner != pda_account.key {
+        panic!("bad obligation ownership!");
+    }
+    let collateral = spl_token::state::Account::unpack(&collateral_info.data.borrow())?;
+    if &collateral.owner != pda_account.key {
+        panic!("bad collateral ownership!");
+    }
 
     // refresh reserve
     invoke(
@@ -213,6 +232,22 @@ fn unwrap(accounts: &[AccountInfo], program_id: &Pubkey, amount: u64, seed: Stri
     let pyth_price_info = next_account_info(accounts_iter)?;
     let switchboard_feed_info = next_account_info(accounts_iter)?;
     let clock_info = next_account_info(accounts_iter)?;
+
+    // check solend contract
+    if solend_program.key !=
+        &Pubkey::from_str(SOLEND).unwrap() {
+        panic!("bad Solend contract!");
+    }
+
+    // check collateral and obligation ownership
+    let obligation = Obligation::unpack(&obligation_info.data.borrow())?;
+    if &obligation.owner != pda_account.key {
+        panic!("bad obligation ownership!");
+    }
+    let collateral = spl_token::state::Account::unpack(&collateral_info.data.borrow())?;
+    if &collateral.owner != pda_account.key {
+        panic!("bad collateral ownership!");
+    }
 
     // create seed strings from provided token
     let pda_seed = format!("FLU:{}_OBLIGATION", seed);
