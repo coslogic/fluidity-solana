@@ -159,3 +159,7 @@ the program's derived obligation authority account for that token.
 ### Installing the dependencies
 
 	cargo install cargo-fuzz
+
+### Run a test validator with deployed contracts
+
+	make run-test-validator
