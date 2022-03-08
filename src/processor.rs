@@ -28,6 +28,9 @@ use {
 // the public key of the authority for payouts and initialisation
 const AUTHORITY: &str = "sohTpNitFg3WZeEcbrMunnwoZJWP4t8yisPB5o3DGD5";
 
+// the public key of the solend program
+const SOLEND: &str = "ALend7Ketfx5bxh6ghsCDXAoDrhvEmsXT3cynB6aPLgx";
+
 // struct defining fludity data account
 #[derive(BorshDeserialize, BorshSerialize, Debug, PartialEq, Clone)]
 pub struct FluidityData {
@@ -67,6 +70,12 @@ fn wrap(accounts: &[AccountInfo], program_id: &Pubkey, amount: u64, seed: String
         panic!("Amount of liquidity less than two, Solend rounding error!");
     }
 
+    // check solend contract
+    if solend_program.key !=
+        &Pubkey::from_str(SOLEND).unwrap() {
+        panic!("bad Solend contract!");
+    }
+
     // create seed strings following format
     let pda_seed = format!("FLU:{}_OBLIGATION", seed);
     let data_seed = format!("FLU:{}_DATA", seed);
@@ -83,6 +92,16 @@ fn wrap(accounts: &[AccountInfo], program_id: &Pubkey, amount: u64, seed: String
 
     // check mints
     check_mints_and_pda(&fluidity_data_account, *token_mint.key, *fluidity_mint.key, *pda_account.key);
+
+    // check collateral and obligation ownership
+    let obligation = Obligation::unpack(&obligation_info.data.borrow())?;
+    if &obligation.owner != pda_account.key {
+        panic!("bad obligation ownership!");
+    }
+    let collateral = spl_token::state::Account::unpack(&collateral_info.data.borrow())?;
+    if &collateral.owner != pda_account.key {
+        panic!("bad collateral ownership!");
+    }
 
     // refresh reserve
     invoke(
@@ -216,6 +235,22 @@ fn unwrap(accounts: &[AccountInfo], program_id: &Pubkey, amount: u64, seed: Stri
     let switchboard_feed_info = next_account_info(accounts_iter)?;
     let clock_info = next_account_info(accounts_iter)?;
 
+    // check solend contract
+    if solend_program.key !=
+        &Pubkey::from_str(SOLEND).unwrap() {
+        panic!("bad Solend contract!");
+    }
+
+    // check collateral and obligation ownership
+    let obligation = Obligation::unpack(&obligation_info.data.borrow())?;
+    if &obligation.owner != pda_account.key {
+        panic!("bad obligation ownership!");
+    }
+    let collateral = spl_token::state::Account::unpack(&collateral_info.data.borrow())?;
+    if &collateral.owner != pda_account.key {
+        panic!("bad collateral ownership!");
+    }
+
     // create seed strings from provided token
     let pda_seed = format!("FLU:{}_OBLIGATION", seed);
     let data_seed = format!("FLU:{}_DATA", seed);
@@ -347,6 +382,7 @@ fn payout(accounts: &[AccountInfo], amount: u64, seed: String, bump: u8) -> Prog
     let fluidity_mint = next_account_info(accounts_iter)?;
     let pda_account = next_account_info(accounts_iter)?;
     let obligation_info = next_account_info(accounts_iter)?;
+    let reserve_info = next_account_info(accounts_iter)?;
     let payout_account_a = next_account_info(accounts_iter)?;
     let payout_account_b = next_account_info(accounts_iter)?;
     let payer = next_account_info(accounts_iter)?;
@@ -359,26 +395,22 @@ fn payout(accounts: &[AccountInfo], amount: u64, seed: String, bump: u8) -> Prog
 
     // scale/clamp amount to be AT MOST 80% of the prize pool
 
-    // get obligation struct
+    // get obligation and reserve structs
     let obligation = Obligation::unpack(&obligation_info.data.borrow())?;
-    // get value of obligations as u128 (current has 18 decimals)
-    let deposited_value = obligation.deposited_value.to_scaled_val()?;
+    let reserve = Reserve::unpack(&reserve_info.data.borrow())?;
+    // get value of obligations
+    let deposited_amount = obligation.deposits[0].deposited_amount;
+    let deposited_value = reserve.collateral_exchange_rate()?
+        .collateral_to_liquidity(deposited_amount).unwrap();
     // normalise
     // get fluidity mint object
     let fluid_mint = spl_token::state::Mint::unpack(&fluidity_mint.data.borrow())?;
     let decimals = fluid_mint.decimals as u32;
 
-    // convert to u64 with correct decimals
-    // solend gives us 1e18 times the actual amount, which we want to adjust to be
-    // consistent with spl-token decimals
-    let tvl = u64::try_from(
-        deposited_value/10u128.pow(18 - decimals)
-    ).unwrap();
-
     // get amount of usdc deposited (has 6 decimals)
     let deposited_tokens = fluid_mint.supply;
     // get available prize pool (80% of pool)
-    let available_prize_pool = (tvl - deposited_tokens)
+    let available_prize_pool = (deposited_value - deposited_tokens)
         .checked_mul(8).unwrap()
         .checked_div(10).unwrap();
 
@@ -559,22 +591,20 @@ pub fn log_tvl(accounts: &[AccountInfo], program_id: &Pubkey) -> ProgramResult {
         ],
     )?;
 
-    // deserialize obligation
+    // deserialize obligation and reserve
     let obligation = Obligation::unpack(&obligation_info.data.borrow())?;
+    let reserve = Reserve::unpack(&reserve_info.data.borrow())?;
 
     // get data
     let mut data = data_account.try_borrow_mut_data()?;
 
     // serialize value of obligations (incl. interest) into data account
     // get scaled u128 val. it has 18 decimal places so divide by 1e18-n to get n decimals
-    let deposited_value = obligation.deposited_value.to_scaled_val()?;
+    let deposited_amount = obligation.deposits[0].deposited_amount;
+    let deposited_value = reserve.collateral_exchange_rate()?
+        .collateral_to_liquidity(deposited_amount).unwrap();
 
-    // get decimals for normalisation
-    let decimals = 6;
-
-    u64::try_from(
-        deposited_value/10u128.pow(18 - decimals)
-    ).unwrap().serialize(&mut &mut data[..])?;
+    deposited_value.serialize(&mut &mut data[..])?;
 
     Ok(())
 }

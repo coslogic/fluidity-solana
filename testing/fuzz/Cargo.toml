@@ -23,7 +23,7 @@ num-traits = "0.2"
 thiserror = "1.0"
 
 [dependencies.solana-fluidity]
-path = ".."
+path = "../.."
 
 # Prevent this from interfering with workspaces
 [workspace]
@@ -42,8 +42,8 @@ path = "fuzz_targets/fuzz_log_tvl.rs"
 test = false
 doc = false
 
-[[bin]]
-name = "fuzz_wrap"
-path = "fuzz_targets/fuzz_wrap.rs"
-test = false
-doc = false
+# [[bin]]
+# name = "fuzz_wrap"
+# path = "fuzz_targets/fuzz_wrap.rs"
+# test = false
+# doc = false
