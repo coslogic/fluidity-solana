@@ -11,3 +11,4 @@ miri_test
 cargo_geiger
 cargo_audit
 !testing/*
+testing/fuzz/target
