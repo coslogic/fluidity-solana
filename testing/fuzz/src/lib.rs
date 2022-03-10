@@ -1,6 +1,6 @@
 #![deny(unaligned_references)]
 use std::mem::size_of;
-use std::{str::FromStr};
+use std::str::FromStr;
 
 use bumpalo::Bump;
 use safe_transmute::to_bytes::{transmute_to_bytes, transmute_to_bytes_mut};
@@ -78,18 +78,23 @@ pub fn allocate_contract_data(data_size: usize, bump: &Bump) -> &mut [u8] {
     &mut transmute_to_bytes_mut(u64_data)[3..padded_data_size + 3]
 }
 
-pub fn create_contract_acc<'bump>(data_size: usize, contract_addr: &'bump Pubkey, bump: &'bump Bump, rent: Rent) -> AccountInfo<'bump> {
+pub fn create_contract_acc<'bump>(
+    data_size: usize,
+    contract_addr: &'bump Pubkey,
+    bump: &'bump Bump,
+    rent: Rent,
+) -> AccountInfo<'bump> {
     let padded_data_size = pad_bpf_data_size(data_size);
     let lamports = rent.minimum_balance(padded_data_size);
     AccountInfo::new(
-        random_pubkey(bump),    // Pubkey
-        false,                  // Is signer
-        true,                   // Is writable
-        bump.alloc(lamports),   // Lamports
-        allocate_contract_data(data_size, bump),    // Data
-        contract_addr,          // Owner
-        false,                  // Executable
-        Epoch::default(),       // Recent epoch
+        random_pubkey(bump),                     // Pubkey
+        false,                                   // Is signer
+        true,                                    // Is writable
+        bump.alloc(lamports),                    // Lamports
+        allocate_contract_data(data_size, bump), // Data
+        contract_addr,                           // Owner
+        false,                                   // Executable
+        Epoch::default(),                        // Recent epoch
     )
 }
 
@@ -108,15 +113,17 @@ pub fn create_token_acc<'bump, 'a, 'b>(
     account.amount = balance;
     SplAccount::pack(account, data).unwrap();
 
+    let initialLamports = rent.minimum_balance(data.len());
+
     AccountInfo::new(
-        random_pubkey(bump),    // Pubkey
-        false,                  // Is signer
-        true,                   // Is writable
-        bump.alloc(rent.minimum_balance(data.len())),   // Lamports
-        data,                   // Data
-        &spl_token::ID,         // Owner
-        false,                  // Executable
-        Epoch::default(),       // Recent epoch
+        random_pubkey(bump),         // Pubkey
+        false,                       // Is signer
+        true,                        // Is writable
+        bump.alloc(initialLamports), // Lamports
+        data,                        // Data
+        &spl_token::ID,              // Owner
+        false,                       // Executable
+        Epoch::default(),            // Recent epoch
     )
 }
 
@@ -126,15 +133,17 @@ pub fn create_token_mint(bump: &Bump, rent: Rent) -> AccountInfo {
     mint.is_initialized = true;
     Mint::pack(mint, data).unwrap();
 
+    let initialLamports = rent.minimum_balance(data.len());
+
     AccountInfo::new(
-        random_pubkey(bump),    // Pubkey
-        false,                  // Is signer
-        true,                   // Is writable
-        bump.alloc(rent.minimum_balance(data.len())),   // Lamports
-        data,                   // Data
-        &spl_token::ID,         // Owner
-        false,                  // Executable
-        Epoch::default(),       // Recent epoch
+        random_pubkey(bump),         // Pubkey
+        false,                       // Is signer
+        true,                        // Is writable
+        bump.alloc(initialLamports), // Lamports
+        data,                        // Data
+        &spl_token::ID,              // Owner
+        false,                       // Executable
+        Epoch::default(),            // Recent epoch
     )
 }
 
@@ -148,27 +157,27 @@ pub fn create_sol_acc_with_pubkey<'bump>(
     bump: &'bump Bump,
 ) -> AccountInfo<'bump> {
     AccountInfo::new(
-        pubkey,    // Pubkey
-        true,                  // Is signer
-        false,                   // Is writable
-        bump.alloc(lamports),   // Lamports
-        &mut [],                   // Data
-        &system_program::ID,         // Owner
-        false,                  // Executable
-        Epoch::default(),       // Recent epoch
+        pubkey,               // Pubkey
+        true,                 // Is signer
+        false,                // Is writable
+        bump.alloc(lamports), // Lamports
+        &mut [],              // Data
+        &system_program::ID,  // Owner
+        false,                // Executable
+        Epoch::default(),     // Recent epoch
     )
 }
 
 pub fn create_spl_token_program(bump: &Bump) -> AccountInfo {
     AccountInfo::new(
-        &spl_token::ID,    // Pubkey
-        false,             // Is signer
-        false,             // Is writable
-        bump.alloc(0),     // Lamports
-        &mut [],           // Data
-        &bpf_loader::ID,   // Owner
-        false,             // Executable
-        Epoch::default(),  // Recent epoch
+        &spl_token::ID,   // Pubkey
+        false,            // Is signer
+        false,            // Is writable
+        bump.alloc(0),    // Lamports
+        &mut [],          // Data
+        &bpf_loader::ID,  // Owner
+        false,            // Executable
+        Epoch::default(), // Recent epoch
     )
 }
 
@@ -176,41 +185,28 @@ pub fn create_rent_sysvar_acc(lamports: u64, rent: Rent, bump: &Bump) -> Account
     let data = bump.alloc_slice_fill_copy(size_of::<Rent>(), 0u8);
     let mut account_info = AccountInfo::new(
         &sysvar::rent::ID,    // Pubkey
-        false,             // Is signer
-        false,             // Is writable
-        bump.alloc(lamports),     // Lamports
-        data,           // Data
-        &sysvar::ID,   // Owner
-        false,             // Executable
-        Epoch::default(),  // Recent epoch
+        false,                // Is signer
+        false,                // Is writable
+        bump.alloc(lamports), // Lamports
+        data,                 // Data
+        &sysvar::ID,          // Owner
+        false,                // Executable
+        Epoch::default(),     // Recent epoch
     );
     rent.to_account_info(&mut account_info).unwrap();
     account_info
 }
 
-// fn gen_signer_seeds<'a>(nonce: &'a u64, contract: &'a Pubkey) -> [&'a [u8]; 2] {
-//     [contract.as_ref(), bytes_of(nonce)]
-// }
-
-// fn gen_signer_key(
-//     nonce: u64,
-//     contract: &Pubkey,
-//     contract_key: &Pubkey,
-// ) -> Result<Pubkey, ProgramError>{
-//     let seeds = gen_signer_seeds(&nonce, contract);
-//     Ok(Pubkey::create_program_address)
-// }
-
 pub fn create_signer_acc<'bump>(pubkey: &'bump Pubkey, bump: &'bump Bump) -> AccountInfo<'bump> {
     AccountInfo::new(
-        pubkey,             // Pubkey
-        true,               // Is signer
-        false,              // Is writable
-        bump.alloc(0),      // Lamports
-        &mut [],               // Data
-        &system_program::ID,        // Owner
-        false,              // Executable
-        Epoch::default(),   // Recent epoch
+        pubkey,              // Pubkey
+        true,                // Is signer
+        false,               // Is writable
+        bump.alloc(0),       // Lamports
+        &mut [],             // Data
+        &system_program::ID, // Owner
+        false,               // Executable
+        Epoch::default(),    // Recent epoch
     )
 }
 
@@ -222,29 +218,22 @@ pub fn setup_payout_keys(bump: &Bump) -> PayoutAccounts {
 
     let token_program = create_spl_token_program(bump);
     let fluidity_mint = create_token_mint(bump, rent);
-    let pda_account_seed = format!("FLU:{}_OBLIGATION", "USDC");   // TODO: Change this when we support more toks
-    let (pda_pubkey, _) = Pubkey::find_program_address(&[pda_account_seed.as_bytes()], &contract_key);
+    let pda_account_seed = format!("FLU:{}_OBLIGATION", "USDC"); // TODO: Change this when we support more toks
+    let (pda_pubkey, _) =
+        Pubkey::find_program_address(&[pda_account_seed.as_bytes()], &contract_key);
+
     // let pda_account = Pubkey::create_with_seed(&pda_pubkey, &data_account_seed, &program_id).unwrap();
     // Derived acc -> Pubkey::create_with_seed CLI/src/utils
     // let pda_account = derived_acc (seed, bump seed)
-    let pda_account = create_sol_acc(0, bump);
-    let obligation_info = create_sol_acc(0, bump);// derived acc, Owned by solend program, auth pda
     
+    let pda_account = create_sol_acc(0, bump);
+    let obligation_info = create_sol_acc(0, bump); // derived acc, Owned by solend program, auth pda
+
     let payer = create_signer_acc(random_pubkey(bump), bump);
 
-    let payout_account_a = create_token_acc(fluidity_mint.key,
-        payer.key,
-        0,
-        bump,
-        rent
-    );
+    let payout_account_a = create_token_acc(fluidity_mint.key, payer.key, 0, bump, rent);
 
-    let payout_account_b = create_token_acc(fluidity_mint.key,
-        payer.key,
-        0,
-        bump,
-        rent
-    );
+    let payout_account_b = create_token_acc(fluidity_mint.key, payer.key, 0, bump, rent);
 
     PayoutAccounts {
         token_program,
@@ -258,7 +247,11 @@ pub fn setup_payout_keys(bump: &Bump) -> PayoutAccounts {
 }
 
 /// Runs contract entry point
-pub fn process_instruction<'a>(program_id: &Pubkey, accounts: &[AccountInfo<'a>], instruction_data: &[u8]) -> ProgramResult {
+pub fn process_instruction<'a>(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo<'a>],
+    instruction_data: &[u8],
+) -> ProgramResult {
     let original_data: Vec<Vec<u8>> = accounts
         .iter()
         .map(|account| account.try_borrow_data().unwrap().to_vec())

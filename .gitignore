@@ -1,4 +1,12 @@
 target
 docker
+
+# Testing files
 cargo_fuzz
-target
+cargo_test
+soteria_analyze
+.coderrect
+miri_test
+cargo_geiger
+cargo_audit
+!testing/*
