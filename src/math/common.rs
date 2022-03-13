@@ -34,3 +34,24 @@ pub trait TryMul<RHS>: Sized {
     /// Multiply
     fn try_mul(self, rhs: RHS) -> Result<Self, ProgramError>;
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use num_traits::checked_pow;
+
+    #[test]
+    fn test_scale_wad() {
+            assert_eq!(checked_pow(10u64, SCALE).unwrap(), WAD);
+    }
+
+    #[test]
+    fn test_scale_half_wad() {
+        assert_eq!(checked_pow(10u64, SCALE).unwrap(), HALF_WAD * 2);
+    }
+
+    #[test]
+    fn test_scale_percent() {
+        assert_eq!(checked_pow(10u64, SCALE).unwrap(), PERCENT_SCALER * 100);
+    }
+}
