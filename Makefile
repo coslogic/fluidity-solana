@@ -1,4 +1,4 @@
-iREPO := fluidity-solana
+REPO := fluidity-solana
 
 CARGO_BUILD_BPF := cargo build-bpf
 
@@ -33,8 +33,15 @@ ${OUT_BPF}: ${SRC_FILES}
 	@${CARGO_BUILD_BPF}
 
 docker: ${SRC_FILES} Dockerfile
-	@${DOCKER_BUILD} -t ${REPO} .
+	@${DOCKER_BUILD} --target base -t fluidity/${REPO} .
 	@touch docker
+
+test-validator: ${SRC_FILES} Dockerfile
+	@${DOCKER_BUILD} --target test-validator -t fluidity/${REPO}:validator .
+	@touch validator
+
+run-test-validator: test-validator
+	@${DOCKER_RUN} -p 8899:8899 -p 8900:8900 -t fluidity/${REPO}:validator
 
 cargo_fuzz: ${SRC_FILES}
 	@${CARGO_FUZZ}

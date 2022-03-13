@@ -159,4 +159,8 @@ the program's derived obligation authority account for that token.
 ### Installing Testing Dependencies
 
 #### Cargo Fuzz
-`cargo install cargo-fuzz`
+	cargo install cargo-fuzz
+
+### Run a test validator with deployed contracts
+
+	make run-test-validator
